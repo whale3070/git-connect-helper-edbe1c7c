@@ -18,13 +18,13 @@ Whale Vault 是一个围绕 **实体书 Secret Code** 的 NFT 金库与收银台
 
 ### 1.1 收银台（读者侧）
 
-完整用户流：**填写地址 + Secret Code → 普通 / 免 Gas Mint → 成功页 → 解锁内容 / 继续下一本**。
+完整用户流：**填写地址 + Secret Code（可扫码填入）→ 普通 / 免 Gas Mint → 成功页 → 解锁内容 / 继续下一本**。
 
 - 填写页 `/scan`
-  - 不再调用摄像头与扫码组件，改为**表单输入**
+  - 以表单为主入口，支持手动输入和扫码填入 Secret Code
   - 表单包含：
     - 波卡钱包地址（必填）
-    - Secret Code（如有，可从实体书抄写或线下扫码得到）
+    - Secret Code（如有，可从实体书抄写或点击“扫码填入”获取）
   - 地址强校验：
     - 拦截以 `0x` 开头的 EVM 地址
     - 使用 `@polkadot/util-crypto` 的 `decodeAddress` 校验 Base58 / Substrate 地址合法性
@@ -32,6 +32,9 @@ Whale Vault 是一个围绕 **实体书 Secret Code** 的 NFT 金库与收银台
     - 支持输入任意合法 Substrate 地址（例如以 `5` 开头的通用地址）
     - 前端自动转换为以 `1` 开头的 Polkadot 主网地址：`encodeAddress(decodeAddress(input), 0)`
     - 转换后的地址会带入后续 Mint 流程
+  - Secret Code 扫码填入：
+    - 点击输入框旁的「扫码填入」按钮，弹出摄像头扫码弹窗
+    - 使用 `@yudiel/react-qr-scanner` 读取书上的二维码，将结果自动写入 Secret Code 输入框
   - 表单提交后跳转 `/mint-confirm?code=...&recipient=...`
 
 - 支付 Mint 页 `/mint-confirm`
@@ -103,6 +106,8 @@ Whale Vault 是一个围绕 **实体书 Secret Code** 的 NFT 金库与收银台
   - `@polkadot/api-contract`
   - `@polkadot/extension-dapp`
   - `@polkadot/util-crypto` / `@polkadot/util`（地址解析与网络前缀转换）
+- 扫码：
+  - `@yudiel/react-qr-scanner`（在 `/scan` 页的 Secret Code 区域以弹窗方式调用摄像头）
 - 图表：`recharts`
 - 特效：`canvas-confetti`
 
@@ -222,13 +227,16 @@ go run main.go
 
 - 文件：`src/pages/Scan.tsx`
 - 功能：
-  - 作为读者入口页，替代原来的扫码 UI
+  - 作为读者入口页，以表单方式收集地址与 Secret Code
   - 提供表单输入：
     - 波卡钱包地址（必填）
-    - Secret Code（如有）
+    - Secret Code（如有，可手填或扫码填入）
   - 地址校验与智能转换：
     - 使用 `decodeAddress` 判断地址是否合法
     - 自动将任意合法 Substrate 地址转换为以 `1` 开头的 Polkadot 主网地址
+  - Secret Code 扫码填入：
+    - 点击 Secret Code 标题旁的「扫码填入」按钮，弹出摄像头扫码弹窗
+    - 使用 `@yudiel/react-qr-scanner` 扫描实体书二维码，将结果自动写入输入框
   - 表单提交后跳转：`/mint-confirm?code={encodedCode}&recipient={normalizedAddress}`
 
 ### 4.3 Mint 确认页 `/mint-confirm`
