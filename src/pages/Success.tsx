@@ -7,6 +7,11 @@ import { web3Accounts, web3Enable } from '@polkadot/extension-dapp'
 
 type VerifyState = 'idle' | 'verifying' | 'granted' | 'denied' | 'error'
 
+const ARWEAVE_GATEWAY = 'https://arweave.net/'
+const BOOKS: Record<number, { txId: string }> = {
+  1: { txId: 'uxtt46m7gTAAcS9pnyh8LkPErCr4PFJiqYjQnWcbzBI' }
+}
+
 export default function Success() {
   const [params] = useSearchParams()
   const bookIdRaw = params.get('book_id') ?? ''
@@ -89,7 +94,18 @@ export default function Success() {
     }
   }
 
-  const arweaveUrl = arTxId ? `https://arweave.net/${arTxId}` : ''
+  const arweaveUrl = useMemo(() => {
+    if (arTxId) {
+      return `${ARWEAVE_GATEWAY}${arTxId}`
+    }
+    if (bookId !== null) {
+      const meta = BOOKS[bookId]
+      if (meta?.txId) {
+        return `${ARWEAVE_GATEWAY}${meta.txId}`
+      }
+    }
+    return ''
+  }, [arTxId, bookId])
   const matrixUrl = 'https://matrix.to/#/#whale-vault:matrix.org'
 
   return (
