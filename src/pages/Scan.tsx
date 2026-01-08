@@ -1,19 +1,35 @@
 import React, { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { decodeAddress, encodeAddress } from '@polkadot/util-crypto'
 
 export default function Scan() {
   const navigate = useNavigate()
   const [recipient, setRecipient] = useState<string>('')
   const [code, setCode] = useState<string>('')
   const [error, setError] = useState<string>('')
-  const polkadotAddressRegex = useMemo(() => /^1[1-9A-HJ-NP-Za-km-z]{46,47}$/, [])
+  const base58LikeRegex = useMemo(() => /^[1-9A-HJ-NP-Za-km-z]+$/, [])
 
   const validateAddress = (value: string) => {
     const trimmed = value.trim()
     if (!trimmed) return '地址不能为空'
     if (trimmed.startsWith('0x')) return '不支持以太坊地址，请使用波卡(Polkadot)地址'
-    if (!polkadotAddressRegex.test(trimmed)) return '地址格式不正确，请填写以 1 开头的波卡地址'
+    if (!base58LikeRegex.test(trimmed)) return '无效的波卡地址，请检查后重新输入'
+    try {
+      decodeAddress(trimmed)
+    } catch {
+      return '无效的波卡地址，请检查后重新输入'
+    }
     return null
+  }
+
+  const normalizeToPolkadot = (addr: string) => {
+    try {
+      const pub = decodeAddress(addr.trim())
+      const polkadotAddr = encodeAddress(pub, 0)
+      return polkadotAddr
+    } catch {
+      return addr.trim()
+    }
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -28,7 +44,8 @@ export default function Scan() {
       return
     }
     setError('')
-    navigate(`/mint-confirm?code=${encodeURIComponent(code.trim())}&recipient=${encodeURIComponent(recipient.trim())}`)
+    const normalized = normalizeToPolkadot(recipient)
+    navigate(`/mint-confirm?code=${encodeURIComponent(code.trim())}&recipient=${encodeURIComponent(normalized)}`)
   }
 
   return (
@@ -54,6 +71,16 @@ export default function Scan() {
               placeholder="请输入您的波卡钱包地址（以 1 开头）"
               value={recipient}
               onChange={(e) => setRecipient(e.target.value)}
+              onBlur={() => {
+                if (!recipient.trim()) return
+                const err = validateAddress(recipient)
+                if (err) {
+                  setError(err)
+                  return
+                }
+                const normalized = normalizeToPolkadot(recipient)
+                setRecipient(normalized)
+              }}
             />
           </div>
           <div>

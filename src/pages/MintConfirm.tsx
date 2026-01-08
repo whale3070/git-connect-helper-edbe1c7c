@@ -5,6 +5,7 @@ import { ApiPromise, WsProvider } from '@polkadot/api'
 import { ContractPromise } from '@polkadot/api-contract'
 import { web3Enable, web3Accounts, web3FromAddress } from '@polkadot/extension-dapp'
 import { BACKEND_URL } from '../config/backend'
+import { decodeAddress, encodeAddress } from '@polkadot/util-crypto'
 
 type MintState = 'idle' | 'sending' | 'in-block' | 'finalized' | 'success' | 'error'
 
@@ -18,13 +19,22 @@ export default function MintConfirm() {
   const [recipient, setRecipient] = useState<string>(() => params.get('recipient') ?? '')
   const { config } = useChainConfig()
   const navigate = useNavigate()
+  const [showConfirm, setShowConfirm] = useState<boolean>(false)
+  const [confirmLoading, setConfirmLoading] = useState<boolean>(false)
+  const [normalizedRecipient, setNormalizedRecipient] = useState<string>('')
+  const [addressConverted, setAddressConverted] = useState<boolean>(false)
 
-  const polkadotAddressRegex = useMemo(() => /^1[1-9A-HJ-NP-Za-km-z]{46,47}$/, [])
+  const base58LikeRegex = useMemo(() => /^[1-9A-HJ-NP-Za-km-z]+$/, [])
   const validateAddress = (value: string) => {
     const trimmed = value.trim()
     if (!trimmed) return '地址不能为空'
     if (trimmed.startsWith('0x')) return '不支持以太坊地址，请使用波卡(Polkadot)地址'
-    if (!polkadotAddressRegex.test(trimmed)) return '地址格式不正确，请填写以 1 开头的波卡地址'
+    if (!base58LikeRegex.test(trimmed)) return '无效的波卡地址，请检查后重新输入'
+    try {
+      decodeAddress(trimmed)
+    } catch {
+      return '无效的波卡地址，请检查后重新输入'
+    }
     return null
   }
 
@@ -149,6 +159,20 @@ export default function MintConfirm() {
       return
     }
     try {
+      const pub = decodeAddress(recipient.trim())
+      const normalized = encodeAddress(pub, 0)
+      setNormalizedRecipient(normalized)
+      setAddressConverted(normalized !== recipient.trim())
+      setShowConfirm(true)
+    } catch {
+      setState('error')
+      setMessage('无效的波卡地址，请检查后重新输入')
+    }
+  }
+
+  const confirmAndSubmit = async () => {
+    setConfirmLoading(true)
+    try {
       setState('sending')
       setMessage('')
       const api = await ApiPromise.create({ provider: new WsProvider(config.endpoint) })
@@ -168,7 +192,7 @@ export default function MintConfirm() {
         gasLimit: '0',
         storageDepositLimit: null as string | null,
         dataHex,
-        signer: recipient,
+        signer: normalizedRecipient || recipient.trim(),
         codeHash
       }
       const url = `${BACKEND_URL}/relay/mint${bookIdRaw ? `?book_id=${encodeURIComponent(bookIdRaw)}` : ''}`
@@ -178,11 +202,15 @@ export default function MintConfirm() {
         body: JSON.stringify(payload)
       })
       if (!resp.ok) {
+        setConfirmLoading(false)
+        setShowConfirm(false)
         setState('error')
         setMessage('后端处理失败')
         return
       }
       const { status, txHash, error } = await resp.json()
+      setConfirmLoading(false)
+      setShowConfirm(false)
       if (status === 'submitted') {
         setState('in-block')
         setMessage(`已提交，交易哈希 ${txHash || ''}`)
@@ -195,6 +223,8 @@ export default function MintConfirm() {
         setMessage('提交失败')
       }
     } catch {
+      setConfirmLoading(false)
+      setShowConfirm(false)
       setState('error')
       setMessage('免 Gas 流程失败')
     }
@@ -248,6 +278,42 @@ export default function MintConfirm() {
           </div>
         </div>
       </div>
+      {showConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className="relative w-full max-w-md rounded-xl border border-white/10 bg-background p-5 space-y-4 shadow-glow">
+            <div className="text-lg font-semibold">确认领取</div>
+            <div className="space-y-2">
+              <div className="text-sm text-white/70">接收地址（波卡主网）</div>
+              <div className="font-mono text-sm break-all">{normalizedRecipient || recipient}</div>
+              {addressConverted && (
+                <div className="text-xs text-white/60">
+                  检测到您输入的是通用格式地址，已自动转换为波卡主网地址：以上展示的 1 开头地址。请确认这是您的接收账户。
+                </div>
+              )}
+              <div className="text-xs text-white/60">
+                风险提示：NFT 铸造后不可撤回，每个兑换码仅限使用一次。
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                className="rounded-lg border border-white/10 bg-white/5 px-3 py-1 text-sm hover:bg-white/10 transition"
+                disabled={confirmLoading}
+                onClick={() => setShowConfirm(false)}
+              >
+                返回修改
+              </button>
+              <button
+                className="rounded-lg bg-primary/20 hover:bg-primary/30 border border-primary/40 text-primary px-4 py-1.5 text-sm transition shadow-glow disabled:opacity-60"
+                disabled={confirmLoading}
+                onClick={confirmAndSubmit}
+              >
+                {confirmLoading ? '处理中...' : '确认领取'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

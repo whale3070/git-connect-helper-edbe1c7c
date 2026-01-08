@@ -18,12 +18,21 @@ Whale Vault 是一个围绕 **实体书 Secret Code** 的 NFT 金库与收银台
 
 ### 1.1 收银台（读者侧）
 
-完整用户流：**扫码 → 普通 / 免 Gas Mint → 成功页 → 解锁内容 / 继续扫码**。
+完整用户流：**填写地址 + Secret Code → 普通 / 免 Gas Mint → 成功页 → 解锁内容 / 继续下一本**。
 
-- 扫码页 `/scan`
-  - 调用摄像头扫描实体书上的 Secret Code（二维码）
-  - 使用 `@yudiel/react-qr-scanner` 适配移动端摄像头
-  - 扫描成功后自动跳转到 `/mint-confirm?code=...`
+- 填写页 `/scan`
+  - 不再调用摄像头与扫码组件，改为**表单输入**
+  - 表单包含：
+    - 波卡钱包地址（必填）
+    - Secret Code（如有，可从实体书抄写或线下扫码得到）
+  - 地址强校验：
+    - 拦截以 `0x` 开头的 EVM 地址
+    - 使用 `@polkadot/util-crypto` 的 `decodeAddress` 校验 Base58 / Substrate 地址合法性
+  - 智能地址转换：
+    - 支持输入任意合法 Substrate 地址（例如以 `5` 开头的通用地址）
+    - 前端自动转换为以 `1` 开头的 Polkadot 主网地址：`encodeAddress(decodeAddress(input), 0)`
+    - 转换后的地址会带入后续 Mint 流程
+  - 表单提交后跳转 `/mint-confirm?code=...&recipient=...`
 
 - 支付 Mint 页 `/mint-confirm`
   - 展示当前 Secret Code 与可选参数（如 `book_id`、`ar`）
@@ -93,7 +102,7 @@ Whale Vault 是一个围绕 **实体书 Secret Code** 的 NFT 金库与收银台
   - `@polkadot/api`
   - `@polkadot/api-contract`
   - `@polkadot/extension-dapp`
-- 扫码：`@yudiel/react-qr-scanner`
+  - `@polkadot/util-crypto` / `@polkadot/util`（地址解析与网络前缀转换）
 - 图表：`recharts`
 - 特效：`canvas-confetti`
 
@@ -127,19 +136,20 @@ Whale Vault 是一个围绕 **实体书 Secret Code** 的 NFT 金库与收银台
 
 位置：`backend/main.go`
 
-职责：
+当前 Demo 职责：
 
-- 接收前端生成的合约调用数据（`Contracts.call`）
-- 使用平台账户（`RELAYER_SEED`）代用户发送交易，支付 Gas
-- 对同一 IP 做频率限制和封禁
-- 记录成功的 Mint 日志到 Redis，用于前端看板
+- 接收前端编码后的合约调用数据（当前为 `mint(code)` 的 dataHex）
+- 校验与解析请求体（包含 `dest` / `dataHex` / `signer` / `codeHash`）
+- 对每个 IP 做简单限流与封禁检查
+- 基于 `codeHash`（Secret Code 的 SHA-256）做**唯一性锁**，防止同一兑换码被并发或重复刷接口
+- 写入成功的 Mint 日志到 Redis（`mint:logs`），供前端销量看板查询
 
 依赖：
 
-- `github.com/centrifuge/go-substrate-rpc-client/v4`
 - `github.com/gorilla/mux`
 - `golang.org/x/time/rate`
 - `github.com/redis/go-redis/v9`
+- （预留）`github.com/centrifuge/go-substrate-rpc-client/v4` 用于接入真实链上调用
 
 ---
 
@@ -178,16 +188,13 @@ npm run build
 
 #### 环境变量
 
-- `WS_ENDPOINT`（可选）
-  - Substrate / Aleph Zero / Astar 等链的 WebSocket 节点
-  - 默认：`wss://ws.azero.dev`
-
-- `RELAYER_SEED`（必需）
-  - 平台方代付 Gas 的账户种子（sr25519）
-  - 用于在链上签名并发送 `Contracts.call`
-
 - `REDIS_ADDR`（可选）
   - Redis 地址，默认 `127.0.0.1:6379`
+
+> 说明：当前 `main.go` 中尚未接入真实 WebSocket 节点与链上签名逻辑，如需将 Demo 升级为真正代付 Gas 的 Relay Server，可基于 go-substrate-rpc-client 扩展新增：
+>
+> - `WS_ENDPOINT`：链的 WebSocket 节点（如 `wss://ws.azero.dev`）
+> - `RELAYER_SEED`：平台方代付 Gas 的账户种子（sr25519）
 
 #### 启动后端
 
@@ -211,23 +218,37 @@ go run main.go
   - 左侧卡片：项目简介 + 「扫描 Secret Code」按钮（跳转 `/scan`）
   - 右侧卡片：可扩展的销量展示组件（`SalesBoard`）
 
-### 4.2 扫码页 `/scan`
+### 4.2 填写页 `/scan`
 
 - 文件：`src/pages/Scan.tsx`
 - 功能：
-  - 调用摄像头扫描二维码
-  - 从扫码结果提取 `rawValue` 作为 Secret Code
-  - 成功后跳转：`/mint-confirm?code={encodedCode}`
+  - 作为读者入口页，替代原来的扫码 UI
+  - 提供表单输入：
+    - 波卡钱包地址（必填）
+    - Secret Code（如有）
+  - 地址校验与智能转换：
+    - 使用 `decodeAddress` 判断地址是否合法
+    - 自动将任意合法 Substrate 地址转换为以 `1` 开头的 Polkadot 主网地址
+  - 表单提交后跳转：`/mint-confirm?code={encodedCode}&recipient={normalizedAddress}`
 
 ### 4.3 Mint 确认页 `/mint-confirm`
 
 - 文件：`src/pages/MintConfirm.tsx`
 - 功能：
   - 展示从 URL 中解析的 `code` 与可选参数 `book_id`、`ar`
-  - 不强制连接钱包：提供下载链接（Nova Wallet / SubWallet）与“接收地址”输入框
+  - 不强制连接钱包：提供钱包下载 / 使用说明（推荐 Talisman / SubWallet）与“接收地址”输入框
+  - 地址处理：
+    - 复用 `decodeAddress` / `encodeAddress`，确保使用 Polkadot 主网地址参与铸造
+    - 从 `/scan` 透传的 `recipient` 自动填入，也可手工修改
+  - 二次确认弹窗：
+    - 在调用后端 `/relay/mint` 之前，弹出 Modal：
+      - 清晰展示最终将用于铸造的 `1` 开头地址
+      - 如发生地址格式转换，给出“已自动转换为波卡主网地址”的提示
+      - 风险提示：“NFT 铸造后不可撤回，每个兑换码仅限使用一次”
+    - 提供「返回修改」与「确认领取」按钮，并在确认后联动 Loading 状态
   - 按钮：
     - 「使用钱包直接 Mint」：通过扩展钱包调用合约 `mint(code)`（用户自费 Gas）
-    - 「确认领取」（免 Gas）：仅填写接收地址，前端编码 `mint(code)` 的 dataHex 并 POST `/relay/mint`，由后端代付 Gas
+    - 「免 Gas 铸造」：填写接收地址后，前端编码 `mint(code)` 的 dataHex 并 POST `/relay/mint`，由后端代付 Gas（当前 Demo 为占位逻辑）
   - 状态展示：发送中 / 区块确认中 / 错误提示
   - 成功后自动跳转至 `/success?book_id=...&ar=...`
 
@@ -300,7 +321,13 @@ go run main.go
 
 ### 6.1 POST `/relay/mint`
 
-用途：免 Gas / 无签名的中继入口。前端编码合约调用数据（当前实现为 `mint(code)` 的 dataHex），后端使用平台账户代付 Gas 并提交交易。
+用途：免 Gas / 无签名的中继入口。当前 Demo 中，后端**不直接连接链节点**，而是：
+
+- 接收前端编码好的 `mint(code)` 调用数据与接收地址
+- 基于 Secret Code 的 SHA-256 哈希（`codeHash`）做唯一性锁防刷
+- 生成占位用的 `txHash`，写入 Redis 日志，供前端看板展示
+
+未来可在此基础上接入真实链节点，由后端使用平台账户代用户发送交易、代付 Gas。
 
 #### 请求体（JSON）
 
@@ -308,14 +335,15 @@ go run main.go
 {
   "dest": "合约地址（SS58）",
   "value": "0",
-  "gasLimit": "0 或估算值字符串",
+  "gasLimit": "0",
   "storageDepositLimit": "字符串或 null",
   "dataHex": "0x 前缀的合约调用数据（当前为 mint(code) 的编码）",
-  "signer": "用户地址（用于风控与日志）"
+  "signer": "用户地址（用于风控与日志）",
+  "codeHash": "Secret Code 的 SHA-256 十六进制字符串"
 }
 ```
 
-> 说明：当前 Demo 简化为“无签名免 Gas”，后端代付 Gas 并调用合约；若需“签名 + mint_meta + 中继”的严格校验方案，可在前端改为签名消息并编码 `mint_meta(...)`，后端进行校验后再提交。
+> 说明：如需“签名 + mint_meta + 中继”的严格校验方案，可在前端改为对结构化消息进行签名并编码 `mint_meta(...)`，后端在验证签名与参数后，再调用链上合约并代付 Gas。
 
 #### URL 查询参数
 
@@ -337,9 +365,11 @@ go run main.go
 #### 风控机制
 
 - 使用 `golang.org/x/time/rate` 为每个 IP 限速
-- 使用 Redis 记录失败次数：
-  - 同一 IP 在一定时间内连续 3 次失败 → 写入 `ban:ip` key，封禁 1 小时
-- 所有成功的 Mint 请求会记录到 Redis 列表 `mint:logs`
+- 使用 Redis 基于 `codeHash` 做唯一性锁：
+  - 每个唯一的 Secret Code 哈希只允许成功铸造一次
+  - 同一 `codeHash` 并发请求时，后续请求会收到“正在铸造中”的错误
+  - 已成功的 `codeHash` 再次请求会收到“此书已经生成过 NFT 了”的错误
+- 所有成功的 Mint 请求会记录到 Redis 列表 `mint:logs`（用于看板与明细）
 
 ### 6.2 GET `/metrics/mint`
 
@@ -392,17 +422,23 @@ go run main.go
 
 ## 8. 典型使用流程（读者视角）
 
-1. 打开 DApp，点击首页「扫描 Secret Code」进入 `/scan`
-2. 授权浏览器使用摄像头，扫描实体书封底的二维码
-3. 扫描成功 → 自动跳转到 `/mint-confirm?code=...`
-4. 在确认页：
+1. 打开 DApp，点击首页入口按钮进入 `/scan`
+2. 在填写页中：
+   - 填写或粘贴自己的波卡钱包地址（支持任意合法 Substrate 地址）
+   - 将实体书上的 Secret Code 抄写到输入框（如有）
+   - 提交后自动跳转到 `/mint-confirm?code=...&recipient=...`
+3. 在确认页：
    - 可选择使用扩展钱包直接 Mint（用户自费 Gas）
-   - 或不连接扩展，仅填写“接收地址”，点击「确认领取」（免 Gas）由后端代付 Gas 完成
-5. 交易成功 → 自动跳转 `/success?book_id=...&ar=...`
+   - 或不连接扩展，仅填写“接收地址”，点击「免 Gas 铸造」走中继流程
+   - 在点击免 Gas 铸造时，会弹出二次确认弹窗：
+     - 展示已转换为 `1` 开头的波卡主网地址
+     - 提示 NFT 铸造不可撤回，每个兑换码仅限一次
+4. 确认后，前端调用 `/relay/mint`，后端做唯一性锁校验并记录日志
+5. 返回成功 → 自动跳转 `/success?book_id=...&ar=...`
 6. 成功页点击「验证访问权限」，通过后：
-   - 跳转 Arweave 正文内容（优先用 `ar`，否则用 BOOKS 映射）
+   - 打开 Arweave 正文内容（优先用 `ar`，否则用 BOOKS 映射）
    - 加入 Matrix 私域社群
-7. 如果有下一本书，点击「继续扫码下一本」再次进入 `/scan`
+7. 如果有下一本书，点击「继续扫码下一本」（链接回 `/scan`）再次进入收银流程
 
 ---
 
