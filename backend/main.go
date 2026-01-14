@@ -2,405 +2,211 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/big"
 	"net/http"
 	"os"
+	"sort"
+	"strconv"
 	"strings"
-	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gorilla/mux"
-	"golang.org/x/time/rate"
+	"github.com/joho/godotenv"
+	"github.com/redis/go-redis/v9"
 )
-
-const (
-	MatrixHomeserver = "https://matrix.org"
-	MatrixRoomID     = "!jOcJpAxdUNYvaMZuqJ:matrix.org"
-	hashCodeFilePath = "hash-code.txt"
-)
-
-type RelayRequest struct {
-	Dest                string  `json:"dest"`
-	Value               string  `json:"value"`
-	GasLimit            string  `json:"gasLimit"`
-	StorageDepositLimit *string `json:"storageDepositLimit"`
-	DataHex             string  `json:"dataHex"`
-	Signer              string  `json:"signer"`
-	CodeHash            string  `json:"codeHash"`
-}
-
-type RelayResponse struct {
-	Status string `json:"status"`
-	TxHash string `json:"txHash,omitempty"`
-	Error  string `json:"error,omitempty"`
-}
-
-type VerifyResponse struct {
-	Ok    bool   `json:"ok"`
-	Error string `json:"error,omitempty"`
-}
-
-type Limiter struct {
-	mu       sync.Mutex
-	visitors map[string]*rate.Limiter
-}
 
 var (
-	codeStatusMu sync.Mutex
-	codeStatus   = map[string]string{}
-
-	validCodesMu sync.Mutex
-	validCodes   = map[string]struct{}{}
-
-	usedCodesMu sync.Mutex
-	usedCodes   = map[string]struct{}{}
-
-	mintLogsMu sync.Mutex
-	mintLogs   []map[string]any
-
-	fileMu sync.Mutex
+	ctx    = context.Background()
+	rdb    *redis.Client
+	client *ethclient.Client
 )
 
-func NewLimiter() *Limiter {
-	return &Limiter{visitors: make(map[string]*rate.Limiter)}
+type CommonResponse struct {
+	Ok     bool   `json:"ok,omitempty"`
+	Status string `json:"status,omitempty"`
+	TxHash string `json:"txHash,omitempty"`
+	Error  string `json:"error,omitempty"`
+	Role   string `json:"role,omitempty"` // 新增 Role 字段
 }
 
-func (l *Limiter) get(ip string) *rate.Limiter {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	if lim, ok := l.visitors[ip]; ok {
-		return lim
-	}
-	lim := rate.NewLimiter(rate.Every(2*time.Second), 3)
-	l.visitors[ip] = lim
-	return lim
-}
-
-func lockCode(hash string) (string, error) {
-	if hash == "" {
-		return "", fmt.Errorf("empty code hash")
-	}
-	codeStatusMu.Lock()
-	defer codeStatusMu.Unlock()
-	if v, ok := codeStatus[hash]; ok {
-		return v, nil
-	}
-	codeStatus[hash] = "PENDING"
-	return "OK", nil
-}
-
-func setCodeSuccess(hash string) {
-	if hash == "" {
-		return
-	}
-	codeStatusMu.Lock()
-	defer codeStatusMu.Unlock()
-	codeStatus[hash] = "SUCCESS"
-	validCodesMu.Lock()
-	delete(validCodes, hash)
-	validCodesMu.Unlock()
-	usedCodesMu.Lock()
-	usedCodes[hash] = struct{}{}
-	usedCodesMu.Unlock()
-	if err := markCodeUsed(hash); err != nil {
-		log.Printf("mark code used failed: %v", err)
-	}
-}
-
-func loadValidCodes(path string) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		log.Printf("cannot read hash code file: %v", err)
-		return
-	}
-	lines := strings.Split(string(data), "\n")
-	valid := map[string]struct{}{}
-	used := map[string]struct{}{}
-	for _, line := range lines {
-		s := strings.TrimSpace(line)
-		if s == "" {
-			continue
-		}
-		if strings.HasPrefix(s, "#") {
-			continue
-		}
-		if strings.HasPrefix(s, "USED:") {
-			code := strings.TrimSpace(strings.TrimPrefix(s, "USED:"))
-			if code != "" {
-				used[code] = struct{}{}
-			}
-			continue
-		}
-		valid[s] = struct{}{}
-	}
-	validCodesMu.Lock()
-	validCodes = valid
-	validCodesMu.Unlock()
-	usedCodesMu.Lock()
-	usedCodes = used
-	usedCodesMu.Unlock()
-	log.Printf("loaded %d valid codes, %d used codes from %s", len(valid), len(used), path)
-}
-
-func markCodeUsed(hash string) error {
-	fileMu.Lock()
-	defer fileMu.Unlock()
-	data, err := os.ReadFile(hashCodeFilePath)
-	if err != nil {
-		return err
-	}
-	lines := strings.Split(string(data), "\n")
-	found := false
-	for i, line := range lines {
-		s := strings.TrimSpace(line)
-		if s == hash {
-			lines[i] = "USED:" + hash
-			found = true
-			break
-		}
-	}
-	if !found {
-		lines = append(lines, "USED:"+hash)
-	}
-	out := strings.Join(lines, "\n")
-	return os.WriteFile(hashCodeFilePath, []byte(out), 0644)
-}
-
-func isCodeValid(hash string) bool {
-	if hash == "" {
-		return false
-	}
-	validCodesMu.Lock()
-	_, ok := validCodes[hash]
-	validCodesMu.Unlock()
-	return ok
-}
-
-func isCodeUsed(hash string) bool {
-	if hash == "" {
-		return false
-	}
-	usedCodesMu.Lock()
-	_, ok := usedCodes[hash]
-	usedCodesMu.Unlock()
-	return ok
-}
-
-func appendMintLog(entry map[string]any) {
-	mintLogsMu.Lock()
-	defer mintLogsMu.Unlock()
-	mintLogs = append(mintLogs, entry)
-	if len(mintLogs) > 1000 {
-		mintLogs = mintLogs[len(mintLogs)-1000:]
-	}
-}
-
-func getMintLogs(limit int) []map[string]any {
-	mintLogsMu.Lock()
-	defer mintLogsMu.Unlock()
-	if limit <= 0 || limit > len(mintLogs) {
-		limit = len(mintLogs)
-	}
-	out := make([]map[string]any, 0, limit)
-	for i := 0; i < limit; i++ {
-		out = append(out, mintLogs[i])
-	}
-	return out
+type ChartData struct {
+	Date  string `json:"date"`
+	Sales int    `json:"sales"`
 }
 
 func main() {
-	limiter := NewLimiter()
-	loadValidCodes(hashCodeFilePath)
+	godotenv.Load()
+	rdb = redis.NewClient(&redis.Options{Addr: os.Getenv("REDIS_ADDR")})
+	
+	var err error
+	client, err = ethclient.Dial(os.Getenv("RPC_URL"))
+	if err != nil {
+		log.Fatalf("无法连接到 RPC: %v", err)
+	}
 
 	router := mux.NewRouter()
-	router.Use(func(next http.Handler) http.Handler {
+
+	// --- 路由 1: 自动补录型预检接口 (已增加管理员跳转逻辑) ---
+	router.HandleFunc("/secret/verify", func(w http.ResponseWriter, r *http.Request) {
+		codeHash := r.URL.Query().Get("codeHash")
+		address := strings.ToLower(r.URL.Query().Get("address")) 
+
+		// 权限校验：从 .env 获取管理配置
+		adminHash := os.Getenv("ADMIN_CODE_HASH")
+		adminAddr := strings.ToLower(os.Getenv("ADMIN_ADDRESS"))
+
+		// 逻辑：如果 Hash 码匹配管理码，且地址是出版社地址 -> 授予 ADMIN 状态
+		if codeHash == adminHash && address == adminAddr {
+			sendJSON(w, http.StatusOK, CommonResponse{
+				Ok:     true, 
+				Status: "ADMIN_ACCESS", 
+				Role:   "publisher",
+			})
+			return
+		}
+
+		if address != "" {
+			savedAddr, err := rdb.Get(ctx, "bind:"+codeHash).Result()
+			if err == redis.Nil {
+				isUsed, _ := rdb.SIsMember(ctx, "vault:codes:used", codeHash).Result()
+				if isUsed {
+					rdb.Set(ctx, "bind:"+codeHash, address, 0)
+					sendJSON(w, http.StatusOK, CommonResponse{Ok: true, Status: "ALREADY_OWNED"})
+					return
+				}
+			} else if err == nil && strings.ToLower(savedAddr) == address {
+				sendJSON(w, http.StatusOK, CommonResponse{Ok: true, Status: "ALREADY_OWNED"})
+				return
+			}
+		}
+		
+		isValid, _ := rdb.SIsMember(ctx, "vault:codes:valid", codeHash).Result()
+		if !isValid {
+			isUsed, _ := rdb.SIsMember(ctx, "vault:codes:used", codeHash).Result()
+			if isUsed {
+				sendJSON(w, http.StatusConflict, CommonResponse{Ok: false, Error: "USED"})
+			} else {
+				sendJSON(w, http.StatusForbidden, CommonResponse{Ok: false, Error: "INVALID"})
+			}
+			return
+		}
+		sendJSON(w, http.StatusOK, CommonResponse{Ok: true})
+	}).Methods("GET")
+
+	// --- 路由 2: 链上铸造接口 ---
+	router.HandleFunc("/relay/mint", func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Dest     string `json:"dest"`
+			CodeHash string `json:"codeHash"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			sendJSON(w, http.StatusBadRequest, CommonResponse{Error: "参数错误"})
+			return
+		}
+
+		valid, _ := rdb.SIsMember(ctx, "vault:codes:valid", req.CodeHash).Result()
+		if !valid {
+			sendJSON(w, http.StatusForbidden, CommonResponse{Error: "兑换码无效"})
+			return
+		}
+
+		txHash, err := executeMint(req.Dest)
+		if err != nil {
+			sendJSON(w, http.StatusInternalServerError, CommonResponse{Error: "铸造失败"})
+			return
+		}
+
+		pipe := rdb.Pipeline()
+		pipe.SRem(ctx, "vault:codes:valid", req.CodeHash)
+		pipe.SAdd(ctx, "vault:codes:used", req.CodeHash)
+		pipe.Set(ctx, "bind:"+req.CodeHash, req.Dest, 0) 
+		pipe.Exec(ctx)
+
+		go notifyMatrix(req.Dest, txHash)
+		sendJSON(w, http.StatusOK, CommonResponse{Status: "submitted", TxHash: txHash})
+	}).Methods("POST")
+
+	// --- 路由 3: 销量统计接口 ---
+	router.HandleFunc("/api/v1/stats/sales", func(w http.ResponseWriter, r *http.Request) {
+		stats, err := rdb.HGetAll(ctx, "whale_vault:daily_mints").Result()
+		if err != nil {
+			sendJSON(w, http.StatusInternalServerError, CommonResponse{Error: "读取统计数据失败"})
+			return
+		}
+
+		type dailyItem struct {
+			date  string
+			count int
+		}
+		var items []dailyItem
+		for date, countStr := range stats {
+			count, _ := strconv.Atoi(countStr)
+			items = append(items, dailyItem{date: date, count: count})
+		}
+		sort.Slice(items, func(i, j int) bool {
+			return items[i].date < items[j].date
+		})
+
+		var responseData []ChartData
+		totalSales := 0
+		for _, item := range items {
+			totalSales += item.count
+			responseData = append(responseData, ChartData{
+				Date:  item.date,
+				Sales: totalSales,
+			})
+		}
+		sendJSON(w, http.StatusOK, responseData)
+	}).Methods("GET")
+
+	cors := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Access-Control-Allow-Origin", "*")
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 			if r.Method == "OPTIONS" {
-				w.WriteHeader(http.StatusOK)
 				return
 			}
 			next.ServeHTTP(w, r)
 		})
-	})
-
-	router.HandleFunc("/secret/verify", func(w http.ResponseWriter, r *http.Request) {
-		codeHash := r.URL.Query().Get("codeHash")
-		if codeHash == "" {
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(VerifyResponse{Ok: false, Error: "missing codeHash"})
-			return
-		}
-		if isCodeUsed(codeHash) {
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(VerifyResponse{Ok: false, Error: "code used"})
-			return
-		}
-		if !isCodeValid(codeHash) {
-			w.WriteHeader(http.StatusForbidden)
-			json.NewEncoder(w).Encode(VerifyResponse{Ok: false, Error: "invalid code"})
-			return
-		}
-		json.NewEncoder(w).Encode(VerifyResponse{Ok: true})
-	}).Methods("GET")
-
-	router.HandleFunc("/relay/mint", func(w http.ResponseWriter, r *http.Request) {
-		ip := r.Header.Get("X-Forwarded-For")
-		if ip == "" {
-			ip = r.RemoteAddr
-		}
-		if !limiter.get(ip).Allow() {
-			w.WriteHeader(http.StatusTooManyRequests)
-			json.NewEncoder(w).Encode(RelayResponse{Status: "error", Error: "rate limited"})
-			return
-		}
-
-		var req RelayRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(RelayResponse{Status: "error", Error: "invalid json"})
-			return
-		}
-
-		if req.CodeHash == "" {
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(RelayResponse{Status: "error", Error: "missing code hash"})
-			return
-		}
-
-		if isCodeUsed(req.CodeHash) {
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(RelayResponse{Status: "error", Error: "此书已经生成过 NFT 了"})
-			return
-		}
-		if !isCodeValid(req.CodeHash) {
-			w.WriteHeader(http.StatusForbidden)
-			json.NewEncoder(w).Encode(RelayResponse{Status: "error", Error: "无效的兑换码"})
-			return
-		}
-		st, err := lockCode(req.CodeHash)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(RelayResponse{Status: "error", Error: "lock error"})
-			return
-		}
-		if st == "PENDING" {
-			w.WriteHeader(http.StatusTooManyRequests)
-			json.NewEncoder(w).Encode(RelayResponse{Status: "error", Error: "正在铸造中"})
-			return
-		}
-		if st == "SUCCESS" {
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(RelayResponse{Status: "error", Error: "此书已经生成过 NFT 了"})
-			return
-		}
-
-		txHash := fmt.Sprintf("0x%x", time.Now().UnixNano())
-		logEntry := map[string]any{
-			"timestamp": time.Now().Unix(),
-			"tx_hash":   txHash,
-			"book_id":   r.URL.Query().Get("book_id"),
-		}
-		appendMintLog(logEntry)
-		setCodeSuccess(req.CodeHash)
-		json.NewEncoder(w).Encode(RelayResponse{Status: "submitted", TxHash: txHash})
-	}).Methods("POST")
-
-	// Matrix invitation endpoint
-	router.HandleFunc("/api/matrix/test-invite", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "POST" {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Method not allowed"})
-			return
-		}
-
-		var req struct {
-			MatrixID string `json:"matrixId"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Invalid request format"})
-			return
-		}
-
-		token := "mat_ZVZBVzMyxjn1IMKXMCSIpKyhPuz0qS_86XDZ3"
-		if token == "" {
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Backend not configured with MATRIX_ACCESS_TOKEN"})
-			return
-		}
-
-		// Build Matrix API request
-		url := fmt.Sprintf("%s/_matrix/client/v3/rooms/%s/invite", MatrixHomeserver, MatrixRoomID)
-		payload, _ := json.Marshal(map[string]string{"user_id": req.MatrixID})
-
-		log.Printf("Inviting user %s to Matrix room...\n", req.MatrixID)
-
-		matrixReq, err := http.NewRequest("POST", url, bytes.NewBuffer(payload))
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Failed to create request"})
-			return
-		}
-		matrixReq.Header.Set("Authorization", "Bearer "+token)
-		matrixReq.Header.Set("Content-Type", "application/json")
-
-		client := &http.Client{Timeout: 10 * time.Second}
-		resp, err := client.Do(matrixReq)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Connection to Matrix server timed out"})
-			return
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			w.WriteHeader(resp.StatusCode)
-			json.NewEncoder(w).Encode(map[string]string{"error": "Matrix API returned error, please check token permissions or room ID"})
-			return
-		}
-
-		log.Printf("Successfully invited user: %s\n", req.MatrixID)
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]string{"message": "success"})
-	}).Methods("POST")
-
-	// Root status endpoint
-	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		status := map[string]interface{}{
-			"status": "Whale Vault Backend is Running",
-			"services": map[string]string{
-				"relay":  "active",
-				"matrix": "active",
-			},
-			"endpoints": map[string]string{
-				"relay":         "/relay/mint",
-				"verify":        "/secret/verify",
-				"metrics":       "/metrics/mint",
-				"matrix_invite": "/api/matrix/test-invite",
-			},
-		}
-		json.NewEncoder(w).Encode(status)
-	}).Methods("GET")
-
-	// Metrics endpoint for frontend
-	router.HandleFunc("/metrics/mint", func(w http.ResponseWriter, r *http.Request) {
-		out := getMintLogs(50)
-		json.NewEncoder(w).Encode(out)
-	}).Methods("GET")
-
-	addr := ":8080"
-	log.Printf("🚀 Whale Vault Backend is starting...")
-	log.Printf("📍 Listening on %s", addr)
-	log.Printf("🔧 Services: Relay API, Matrix Integration")
-	log.Printf("🔗 Endpoints: /relay/mint, /api/matrix/test-invite, /metrics/mint")
-
-	if err := http.ListenAndServe(addr, router); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
 	}
+
+	fmt.Printf("[%s] 🚀 鲸鱼金库：管理员跳转功能已就绪 :8080\n", time.Now().Format("15:04:05"))
+	http.ListenAndServe(":8080", cors(router))
+}
+
+// executeMint, notifyMatrix, sendJSON 函数保持不变...
+func executeMint(destAddr string) (string, error) {
+	privateKey, _ := crypto.HexToECDSA(os.Getenv("PRIVATE_KEY"))
+	fromAddress := crypto.PubkeyToAddress(privateKey.PublicKey)
+	nonce, _ := client.PendingNonceAt(ctx, fromAddress)
+	gasPrice, _ := client.SuggestGasPrice(ctx)
+	chainID, _ := strconv.Atoi(os.Getenv("CHAIN_ID"))
+	data := append(common.FromHex("6a627842"), common.LeftPadBytes(common.HexToAddress(destAddr).Bytes(), 32)...)
+	tx := types.NewTransaction(nonce, common.HexToAddress(os.Getenv("CONTRACT_ADDR")), big.NewInt(0), 200000, gasPrice, data)
+	signedTx, _ := types.SignTx(tx, types.NewEIP155Signer(big.NewInt(int64(chainID))), privateKey)
+	err := client.SendTransaction(ctx, signedTx)
+	return signedTx.Hash().Hex(), err
+}
+
+func notifyMatrix(dest, txHash string) {
+	msg := fmt.Sprintf("🎉 鲸鱼金库：新 NFT 铸造！\n地址: %s\n哈希: %s", dest, txHash)
+	url := fmt.Sprintf("%s/_matrix/client/r0/rooms/%s/send/m.room.message?access_token=%s", 
+		os.Getenv("MATRIX_URL"), os.Getenv("MATRIX_ROOM_ID"), os.Getenv("MATRIX_ACCESS_TOKEN"))
+	payload, _ := json.Marshal(map[string]interface{}{"msgtype": "m.text", "body": msg})
+	http.Post(url, "application/json", bytes.NewBuffer(payload))
+}
+
+func sendJSON(w http.ResponseWriter, code int, payload interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(payload)
 }

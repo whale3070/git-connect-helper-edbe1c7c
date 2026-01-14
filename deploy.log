@@ -1,0 +1,1291 @@
+--- [Fri Jan  9 05:57:14 PM UTC 2026] 启动物理接管部署流程 ---
+
+> whale-vault-dapp@0.1.0 build
+> vite build
+
+vite v5.4.21 building for production...
+transforming...
+node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+✓ 2185 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.45 kB │ gzip:   0.30 kB
+dist/assets/index-BbtTu6Pv.css     16.05 kB │ gzip:   3.94 kB
+dist/assets/index-WQ2qb0oU.js   1,563.84 kB │ gzip: 542.16 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 14.94s
+--- 部署完成！当前版本已上线 ---
+--- [Fri Jan  9 06:04:18 PM UTC 2026] 启动物理接管部署流程 ---
+
+> whale-vault-dapp@0.1.0 build
+> vite build
+
+vite v5.4.21 building for production...
+transforming...
+node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+✓ 2185 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.45 kB │ gzip:   0.30 kB
+dist/assets/index-Bkt6pNef.css     18.51 kB │ gzip:   4.19 kB
+dist/assets/index-z3niX873.js   1,564.37 kB │ gzip: 542.37 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 6.47s
+--- 部署完成！当前版本已上线 ---
+--- [Sat Jan 10 03:20:07 AM UTC 2026] 启动物理接管部署流程 ---
+
+> whale-vault-dapp@0.1.0 build
+> vite build
+
+vite v5.4.21 building for production...
+transforming...
+node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+✓ 2185 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.45 kB │ gzip:   0.30 kB
+dist/assets/index-sKdJKTiV.css     18.75 kB │ gzip:   4.24 kB
+dist/assets/index-DRq8xitQ.js   1,564.90 kB │ gzip: 542.74 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 6.41s
+--- 部署完成！当前版本已上线 ---
+--- [Sat Jan 10 03:38:53 AM UTC 2026] 启动全栈物理同步部署 ---
+
+> whale-vault-dapp@0.1.0 build
+> vite build
+
+vite v5.4.21 building for production...
+transforming...
+node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+✓ 2185 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.45 kB │ gzip:   0.30 kB
+dist/assets/index-sKdJKTiV.css     18.75 kB │ gzip:   4.24 kB
+dist/assets/index-DRq8xitQ.js   1,564.90 kB │ gzip: 542.74 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 6.30s
+# command-line-arguments
+./main.go:7:2: "fmt" imported and not used
+--- [Sat Jan 10 03:48:12 AM UTC 2026] 启动全栈物理同步部署 ---
+
+> whale-vault-dapp@0.1.0 build
+> vite build
+
+vite v5.4.21 building for production...
+transforming...
+node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+✓ 2185 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.45 kB │ gzip:   0.31 kB
+dist/assets/index-DaZRynLb.css     18.81 kB │ gzip:   4.25 kB
+dist/assets/index-BGoMOM9q.js   1,565.05 kB │ gzip: 542.81 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 6.25s
+--- ✅ 部署成功：逻辑与物理路径已对齐 ---
+--- [Sat Jan 10 03:56:22 AM UTC 2026] 启动全栈物理同步部署 ---
+
+> whale-vault-dapp@0.1.0 build
+> vite build
+
+vite v5.4.21 building for production...
+transforming...
+node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+✓ 2185 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.45 kB │ gzip:   0.30 kB
+dist/assets/index-C1Stci1u.css     18.77 kB │ gzip:   4.25 kB
+dist/assets/index-BHX6FtBy.js   1,565.19 kB │ gzip: 542.97 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 6.27s
+--- ✅ 部署成功：逻辑与物理路径已对齐 ---
+--- [Sat Jan 10 07:25:42 AM UTC 2026] 启动全栈物理同步部署 ---
+
+> whale-vault-dapp@0.1.0 build
+> vite build
+
+vite v5.4.21 building for production...
+transforming...
+node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+✓ 2185 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.45 kB │ gzip:   0.30 kB
+dist/assets/index-DtiDxaE6.css     18.80 kB │ gzip:   4.25 kB
+dist/assets/index-BHewDBDL.js   1,564.99 kB │ gzip: 542.92 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 6.32s
+--- ✅ 部署成功：逻辑与物理路径已对齐 ---
+--- [Sat Jan 10 07:30:44 AM UTC 2026] 启动全栈物理同步部署 ---
+
+> whale-vault-dapp@0.1.0 build
+> vite build
+
+vite v5.4.21 building for production...
+transforming...
+node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+✓ 2185 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.45 kB │ gzip:   0.31 kB
+dist/assets/index-CPvUK8iZ.css     18.77 kB │ gzip:   4.24 kB
+dist/assets/index-D41bDw9c.js   1,564.15 kB │ gzip: 542.88 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 6.28s
+--- ✅ 部署成功：逻辑与物理路径已对齐 ---
+--- [Sat Jan 10 07:38:32 AM UTC 2026] 启动全栈物理同步部署 ---
+
+> whale-vault-dapp@0.1.0 build
+> vite build
+
+vite v5.4.21 building for production...
+transforming...
+node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+✓ 2185 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.45 kB │ gzip:   0.31 kB
+dist/assets/index-CPvUK8iZ.css     18.77 kB │ gzip:   4.24 kB
+dist/assets/index-D9d6XPrA.js   1,564.32 kB │ gzip: 542.93 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 6.19s
+--- ✅ 部署成功：逻辑与物理路径已对齐 ---
+--- [Sat Jan 10 07:49:54 AM UTC 2026] 启动全栈物理同步部署 ---
+
+> whale-vault-dapp@0.1.0 build
+> vite build
+
+vite v5.4.21 building for production...
+transforming...
+node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+✓ 2185 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.45 kB │ gzip:   0.31 kB
+dist/assets/index-CPvUK8iZ.css     18.77 kB │ gzip:   4.24 kB
+dist/assets/index-D9d6XPrA.js   1,564.32 kB │ gzip: 542.93 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 6.13s
+--- ✅ 部署成功：逻辑与物理路径已对齐 ---
+--- [Sat Jan 10 07:56:42 AM UTC 2026] 启动全栈物理同步部署 ---
+
+> whale-vault-dapp@0.1.0 build
+> vite build
+
+vite v5.4.21 building for production...
+transforming...
+node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+✓ 2185 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.45 kB │ gzip:   0.31 kB
+dist/assets/index-CPvUK8iZ.css     18.77 kB │ gzip:   4.24 kB
+dist/assets/index-D9d6XPrA.js   1,564.32 kB │ gzip: 542.93 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 6.42s
+--- ✅ 部署成功：逻辑与物理路径已对齐 ---
+--- [Sat Jan 10 08:10:16 AM UTC 2026] 启动全栈物理同步部署 ---
+
+> whale-vault-dapp@0.1.0 build
+> vite build
+
+vite v5.4.21 building for production...
+transforming...
+node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+✓ 2185 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.45 kB │ gzip:   0.31 kB
+dist/assets/index-CPvUK8iZ.css     18.77 kB │ gzip:   4.24 kB
+dist/assets/index-D9d6XPrA.js   1,564.32 kB │ gzip: 542.93 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 6.20s
+# command-line-arguments
+./main.go:15:2: "github.com/ethereum/go-ethereum" imported as ethereum and not used
+--- [Sat Jan 10 08:11:37 AM UTC 2026] 启动全栈物理同步部署 ---
+
+> whale-vault-dapp@0.1.0 build
+> vite build
+
+vite v5.4.21 building for production...
+transforming...
+--- [Sat Jan 10 08:14:02 AM UTC 2026] 启动全栈物理同步部署 ---
+
+> whale-vault-dapp@0.1.0 build
+> vite build
+
+vite v5.4.21 building for production...
+transforming...
+node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+✓ 2185 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.45 kB │ gzip:   0.31 kB
+dist/assets/index-CPvUK8iZ.css     18.77 kB │ gzip:   4.24 kB
+dist/assets/index-D9d6XPrA.js   1,564.32 kB │ gzip: 542.93 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 6.28s
+# command-line-arguments
+./main.go:7:2: "fmt" imported and not used
+./main.go:15:2: "github.com/ethereum/go-ethereum" imported as ethereum and not used
+--- [Sat Jan 10 08:20:01 AM UTC 2026] 启动全栈物理同步部署 ---
+
+> whale-vault-dapp@0.1.0 build
+> vite build
+
+vite v5.4.21 building for production...
+transforming...
+node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+✓ 2185 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.45 kB │ gzip:   0.31 kB
+dist/assets/index-CPvUK8iZ.css     18.77 kB │ gzip:   4.24 kB
+dist/assets/index-D9d6XPrA.js   1,564.32 kB │ gzip: 542.93 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 6.23s
+--- ✅ 部署成功：逻辑与物理路径已对齐 ---
+--- [Sat Jan 10 08:34:31 AM UTC 2026] 启动全栈物理同步部署 ---
+
+> whale-vault-dapp@0.1.0 build
+> vite build
+
+vite v5.4.21 building for production...
+transforming...
+node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+✓ 2185 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.45 kB │ gzip:   0.31 kB
+dist/assets/index-CPvUK8iZ.css     18.77 kB │ gzip:   4.24 kB
+dist/assets/index-D9d6XPrA.js   1,564.32 kB │ gzip: 542.93 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 6.21s
+# command-line-arguments
+./main.go:146:54: syntax error: unexpected ( in parameter list; possibly missing comma or )
+--- [Sat Jan 10 08:44:14 AM UTC 2026] 启动全栈物理同步部署 ---
+
+> whale-vault-dapp@0.1.0 build
+> vite build
+
+vite v5.4.21 building for production...
+transforming...
+✓ 17 modules transformed.
+x Build failed in 693ms
+error during build:
+[vite]: Rollup failed to resolve import "lucide-react" from "/opt/Whale-Vault/src/pages/Success.tsx".
+This is most likely unintended because it can break your application at runtime.
+If you do want to externalize this module explicitly add it to
+`build.rollupOptions.external`
+    at viteWarn (file:///opt/Whale-Vault/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:65855:17)
+    at onwarn (file:///opt/Whale-Vault/node_modules/@vitejs/plugin-react/dist/index.js:90:7)
+    at onRollupWarning (file:///opt/Whale-Vault/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:65885:5)
+    at onwarn (file:///opt/Whale-Vault/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:65550:7)
+    at file:///opt/Whale-Vault/node_modules/rollup/dist/es/shared/node-entry.js:21095:13
+    at Object.logger [as onLog] (file:///opt/Whale-Vault/node_modules/rollup/dist/es/shared/node-entry.js:22968:9)
+    at ModuleLoader.handleInvalidResolvedId (file:///opt/Whale-Vault/node_modules/rollup/dist/es/shared/node-entry.js:21712:26)
+    at file:///opt/Whale-Vault/node_modules/rollup/dist/es/shared/node-entry.js:21670:26
+--- [Sat Jan 10 08:44:21 AM UTC 2026] 启动全栈物理同步部署 ---
+
+> whale-vault-dapp@0.1.0 build
+> vite build
+
+vite v5.4.21 building for production...
+transforming...
+✓ 17 modules transformed.
+x Build failed in 689ms
+error during build:
+[vite]: Rollup failed to resolve import "lucide-react" from "/opt/Whale-Vault/src/pages/Success.tsx".
+This is most likely unintended because it can break your application at runtime.
+If you do want to externalize this module explicitly add it to
+`build.rollupOptions.external`
+    at viteWarn (file:///opt/Whale-Vault/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:65855:17)
+    at onwarn (file:///opt/Whale-Vault/node_modules/@vitejs/plugin-react/dist/index.js:90:7)
+    at onRollupWarning (file:///opt/Whale-Vault/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:65885:5)
+    at onwarn (file:///opt/Whale-Vault/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:65550:7)
+    at file:///opt/Whale-Vault/node_modules/rollup/dist/es/shared/node-entry.js:21095:13
+    at Object.logger [as onLog] (file:///opt/Whale-Vault/node_modules/rollup/dist/es/shared/node-entry.js:22968:9)
+    at ModuleLoader.handleInvalidResolvedId (file:///opt/Whale-Vault/node_modules/rollup/dist/es/shared/node-entry.js:21712:26)
+    at file:///opt/Whale-Vault/node_modules/rollup/dist/es/shared/node-entry.js:21670:26
+--- [Sat Jan 10 08:45:37 AM UTC 2026] 启动全栈物理同步部署 ---
+
+> whale-vault-dapp@0.1.0 build
+> vite build
+
+vite v5.4.21 building for production...
+transforming...
+node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+✓ 3857 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.45 kB │ gzip:   0.30 kB
+dist/assets/index-DcEy0IWE.css     20.98 kB │ gzip:   4.61 kB
+dist/assets/index-CyBb4d0o.js   1,566.48 kB │ gzip: 543.54 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 7.31s
+--- ✅ 部署成功：逻辑与物理路径已对齐 ---
+--- [Sat Jan 10 08:48:50 AM UTC 2026] 启动全栈物理同步部署 ---
+
+> whale-vault-dapp@0.1.0 build
+> vite build
+
+vite v5.4.21 building for production...
+transforming...
+node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+✓ 3857 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.45 kB │ gzip:   0.31 kB
+dist/assets/index-Deun4w1Z.css     23.34 kB │ gzip:   4.92 kB
+dist/assets/index-B3cb06FQ.js   1,568.81 kB │ gzip: 544.31 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 7.25s
+--- ✅ 部署成功：逻辑与物理路径已对齐 ---
+--- [Sat Jan 10 08:53:55 AM UTC 2026] 启动全栈物理同步部署 ---
+
+> whale-vault-dapp@0.1.0 build
+> vite build
+
+vite v5.4.21 building for production...
+transforming...
+node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+✓ 3857 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.45 kB │ gzip:   0.30 kB
+dist/assets/index-DTLB7lRz.css     22.34 kB │ gzip:   4.82 kB
+dist/assets/index-BCBfjntm.js   1,566.53 kB │ gzip: 543.70 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 7.15s
+--- ✅ 部署成功：逻辑与物理路径已对齐 ---
+--- [Sat Jan 10 09:01:16 AM UTC 2026] 启动全栈物理同步部署 ---
+
+> whale-vault-dapp@0.1.0 build
+> vite build
+
+vite v5.4.21 building for production...
+transforming...
+node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textdecoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-textencoder/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/util/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/rpc-provider/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-bigint/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-fetch/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-ws/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js (9:23): A comment
+
+"/*#__PURE__*/"
+
+in "node_modules/@polkadot/x-randomvalues/node_modules/@polkadot/x-global/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+✓ 3857 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                     0.45 kB │ gzip:   0.30 kB
+dist/assets/index-DTLB7lRz.css     22.34 kB │ gzip:   4.82 kB
+dist/assets/index-BoFnt6vV.js   1,566.57 kB │ gzip: 543.72 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 7.18s
+--- ✅ 部署成功：逻辑与物理路径已对齐 ---

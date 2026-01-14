@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TERMINAL - HASH CONSUMED</title>
+    <style>
+        body {
+            background-color: #000;
+            color: #ff9900; /* 警告橙，区别于彻底拦截的红色 */
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .container {
+            border: 2px solid #ff9900;
+            padding: 40px;
+            max-width: 600px;
+            background: rgba(20, 10, 0, 0.9);
+            box-shadow: 0 0 20px rgba(255, 153, 0, 0.3);
+            position: relative;
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            margin-top: 0;
+            border-bottom: 2px solid #ff9900;
+            padding-bottom: 10px;
+            letter-spacing: 2px;
+        }
+
+        p {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            color: #ffcc88;
+        }
+
+        .status-badge {
+            display: inline-block;
+            background: #ff9900;
+            color: #000;
+            padding: 2px 8px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .system-log {
+            font-size: 0.85rem;
+            color: #664400;
+            margin-top: 20px;
+            border-top: 1px solid #443300;
+            padding-top: 10px;
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 10px;
+            height: 20px;
+            background: #ff9900;
+            animation: blink 1s infinite;
+            vertical-align: middle;
+        }
+
+        @keyframes blink { 50% { opacity: 0; } }
+
+        .scanline {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 2px;
+            background: rgba(255, 153, 0, 0.05);
+            animation: scan 6s linear infinite;
+        }
+
+        @keyframes scan {
+            0% { top: 0; }
+            100% { top: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="scanline"></div>
+    <div class="container">
+        <div class="status-badge">HASH_ALREADY_USED</div>
+        <h1>403 访问受限</h1>
+        <p>> 验证序列检测完毕...</p>
+        <p>> 错误代码：ERR_SINGLE_USE_TOKEN_EXHAUSTED</p>
+        <p>> 该哈希代码已成功用于 Mint NFT。根据协议逻辑，此密钥已从有效池中移除，无法重复使用。</p>
+        <p>> 褶式(micro)空间已塌缩，正在断开连接...<span class="cursor"></span></p>
+        
+        <div class="system-log">
+            [SYS_LOG]: Hash interaction completed at 198.55.109.102<br>
+            [SYS_LOG]: Object minted. Secondary access denied.
+        </div>
+    </div>
+</body>
+</html>
