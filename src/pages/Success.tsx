@@ -6,12 +6,10 @@ const Success = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   
-  // 从 URL 获取参数
   const txHash = searchParams.get('txHash');
-  const userAddress = searchParams.get('address') || '未知持有人';
+  const userAddress = (searchParams.get('address') || '未知持有人').toLowerCase();
   const codeHash = searchParams.get('codeHash');
   
-  // 勋章编号逻辑
   const rawTokenId = searchParams.get('token_id');
   const displayTokenId = (!rawTokenId || rawTokenId === '0') ? '最新生成' : `#${rawTokenId}`;
 
@@ -20,33 +18,44 @@ const Success = () => {
 
   useEffect(() => {
     const verifyAndRedirect = async () => {
-      // 如果没有 codeHash，视为直接访问，展示基础 UI
       if (!codeHash) {
         setTimeout(() => setIsLoading(false), 1000);
         return;
       }
 
       try {
-        // 请求后端验证接口
-        const response = await fetch(`http://192.168.1.9:8080/secret/verify?codeHash=${codeHash}&address=${userAddress}`);
-        
+        // 请求后端验证接口识别身份角色
+        const response = await fetch(`http://localhost:8080/secret/verify?codeHash=${codeHash}&address=${userAddress}`);
+        const data = await response.json();
+
         if (!response.ok) {
-          throw new Error('身份核验失败');
+          throw new Error(data.error || '身份核验失败');
         }
 
-        // 普通用户验证成功，给予仪式感延迟后显示 UI
-        setTimeout(() => setIsLoading(false), 1500);
-      } catch (err) {
+        // --- 核心逻辑：出版社扫码后直接“瞬移”到热力图 ---
+        if (data.role === 'publisher') {
+          navigate('/heatmap');
+          return;
+        }
+
+        // 作者逻辑预留
+        if (data.role === 'author') {
+           // navigate('/author_dashboard'); 
+           // return;
+        }
+
+        // 只有普通读者才会看到这个页面的 UI
+        setIsLoading(false);
+      } catch (err: any) {
         console.error("验证流程异常:", err);
-        setError("身份确权异常，请联系出版社");
+        setError(err.message || "身份确权异常");
         setIsLoading(false);
       }
     };
 
     verifyAndRedirect();
-  }, [codeHash, userAddress]);
+  }, [codeHash, userAddress, navigate]);
 
-  // 加载中状态（物理存证同步动效）
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#0f172a] text-white flex flex-col items-center justify-center font-sans">
@@ -58,7 +67,6 @@ const Success = () => {
     );
   }
 
-  // 错误处理状态
   if (error) {
     return (
       <div className="min-h-screen bg-[#0f172a] text-white flex flex-col items-center justify-center p-4">
@@ -72,10 +80,9 @@ const Success = () => {
 
   return (
     <div className="min-h-screen bg-[#0f172a] text-white flex flex-col items-center justify-center p-4 font-sans">
-      <div className="max-w-md w-full bg-[#1e293b] border border-slate-700 rounded-3xl p-8 shadow-2xl relative">
+      <div className="max-w-md w-full bg-[#1e293b] border border-slate-700 rounded-3xl p-8 shadow-2xl relative animate-in fade-in zoom-in duration-500">
         
-        {/* 核心验证成功 UI */}
-        <div className="text-center space-y-8 animate-in fade-in zoom-in duration-500">
+        <div className="text-center space-y-8">
           <div className="flex justify-center">
             <div className="relative">
               <CheckCircle className="w-20 h-20 text-green-500 relative z-10" />
@@ -87,53 +94,39 @@ const Success = () => {
             <h2 className="text-3xl font-extrabold text-white flex items-center justify-center gap-2">
               验证成功 <PartyPopper className="w-8 h-8 text-yellow-500" />
             </h2>
-            <p className="text-green-400 font-medium tracking-wide">Whale Vault 访问权限已激活</p>
+            <p className="text-green-400 font-medium tracking-wide">读者勋章已确权</p>
           </div>
 
-          {/* 资产详情卡片 */}
           <div className="bg-slate-900/50 rounded-2xl p-6 text-left space-y-4 border border-slate-700/50">
             <div className="space-y-1">
-              <span className="text-[10px] text-slate-500 uppercase font-bold tracking-[0.2em]">持有地址</span>
+              <span className="text-[10px] text-slate-500 uppercase font-bold tracking-[0.2em]">绑定地址</span>
               <p className="text-xs text-slate-300 font-mono break-all leading-relaxed">{userAddress}</p>
             </div>
-            
             <div className="flex justify-between items-end">
               <div>
                 <span className="text-[10px] text-slate-500 uppercase font-bold tracking-[0.2em]">勋章编号</span>
                 <p className="text-2xl font-black text-blue-500">{displayTokenId}</p>
               </div>
-              <div className="text-right">
-                <span className="text-[10px] text-slate-500 uppercase font-bold tracking-[0.2em]">确权状态</span>
-                <p className="text-xs text-green-500 font-bold italic">PROVED ON CHAIN</p>
-              </div>
+              <p className="text-xs text-green-500 font-bold italic">PROVED ON CHAIN</p>
             </div>
           </div>
 
-          {/* 读者权益出口 */}
           <button 
-            onClick={() => window.location.href = 'https://matrix.to/#/!jOcJpAxdUNYvaMZuqJ:matrix.org?via=matrix.org'} 
-            className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-2xl font-bold transition-all shadow-lg active:scale-95"
+            onClick={() => window.location.href = 'https://matrix.to/#/!jOcJpAxdUNYvaMZuqJ:matrix.org'} 
+            className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 rounded-2xl font-bold transition-all shadow-lg"
           >
-            立即进入读者群 (Matrix)
+            进入读者社区
           </button>
         </div>
 
-        {/* 链上存证查询 */}
         {txHash && (
           <div className="mt-8 pt-6 border-t border-slate-800 text-center">
-            <a 
-              href={`https://testnet-explorer.monad.xyz/tx/${txHash}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-slate-500 hover:text-blue-400 flex items-center justify-center gap-1.5"
-            >
-              在 Explorer 查验存证凭据 <ExternalLink className="w-3 h-3" />
+            <a href={`https://monadscan.com/address/${txHash}`} target="_blank" rel="noreferrer" className="text-xs text-slate-500 hover:text-blue-400 flex items-center justify-center gap-1.5">
+              查看链上存证 <ExternalLink className="w-3 h-3" />
             </a>
           </div>
         )}
       </div>
-      
-      <p className="mt-6 text-slate-600 text-[10px] tracking-widest font-bold uppercase">WHALE VAULT • Decentrailzed Identity System</p>
     </div>
   );
 };
