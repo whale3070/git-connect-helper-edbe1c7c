@@ -86,7 +86,7 @@ export default function Home() {
             {/* 技术支持信息 */}
             <div className="text-center">
               <p className="text-sm text-white/50">
-                技术支持 | 区块链网络: Ethereum Polkadot | 系统版本: 1.0.0
+                技术支持 | 区块链网络: Monad Testnet | 系统版本: 1.0.0
               </p>
             </div>
           </div>

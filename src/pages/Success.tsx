@@ -121,7 +121,13 @@ const Success = () => {
 
         {txHash && (
           <div className="mt-8 pt-6 border-t border-slate-800 text-center">
-            <a href={`https://monadscan.com/address/${txHash}`} target="_blank" rel="noreferrer" className="text-xs text-slate-500 hover:text-blue-400 flex items-center justify-center gap-1.5">
+            {/* 修正后的区块浏览器链接 */}
+            <a 
+              href={`https://testnet-explorer.monad.xyz/tx/${txHash}`} 
+              target="_blank" 
+              rel="noreferrer" 
+              className="text-xs text-slate-500 hover:text-blue-400 flex items-center justify-center gap-1.5"
+            >
               查看链上存证 <ExternalLink className="w-3 h-3" />
             </a>
           </div>

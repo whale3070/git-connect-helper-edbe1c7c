@@ -14,21 +14,20 @@ const Heatmap: React.FC = () => {
 
       try {
         // 2. 加载世界地图 JSON (解决地图不显示的关键)
-        // 使用公开 CDN 加载世界地图数据
         const geoJsonRes = await fetch('https://raw.githubusercontent.com/apache/echarts/master/test/data/map/json/world.json');
         const worldGeoJson = await geoJsonRes.json();
         
         // 注册地图
         echarts.registerMap('world', worldGeoJson);
 
-        // 3. 从你的 Go 后端获取热力图数据
-        // 注意：请确保 IP 地址是你服务器的真实内网或公网 IP
+        // 3. 从您的 Go 后端获取热力图数据
+        // 提示：生产环境下建议使用相对路径或从 .env 获取 URL
         const dataRes = await fetch('http://192.168.47.130:8080/api/v1/analytics/distribution');
         const heatmapData = await dataRes.json();
 
-        // 4. 配置 ECharts
+        // 4. 配置 ECharts 选项
         const option: echarts.EChartsOption = {
-          backgroundColor: '#0f172a', // 与你的 App.tsx 背景色保持一致
+          backgroundColor: '#0f172a', // 与 App.tsx 保持一致的深蓝底色
           title: {
             text: 'WHALE VAULT - 读者分布回响图',
             left: 'center',
@@ -76,7 +75,7 @@ const Heatmap: React.FC = () => {
               name: 'Readers',
               type: 'heatmap',
               coordinateSystem: 'geo',
-              data: heatmapData || [], // 后端数据: [{name: "Ashburn", value: [-77.5, 39.03, 1]}]
+              data: heatmapData || [], // 后端数据格式: [{name: "Beijing", value: [116.46, 39.92, 10]}]
               pointSize: 10,
               blurSize: 15
             }
@@ -86,8 +85,11 @@ const Heatmap: React.FC = () => {
         myChart.setOption(option);
         setLoading(false);
 
-        // 响应式调整
-        window.addEventListener('resize', () => myChart.resize());
+        // 响应式调整：窗口大小变化时重新绘制图表
+        const handleResize = () => myChart.resize();
+        window.addEventListener('resize', handleResize);
+
+        return () => window.removeEventListener('resize', handleResize);
 
       } catch (error) {
         console.error('地图初始化失败:', error);
@@ -98,7 +100,7 @@ const Heatmap: React.FC = () => {
     initChart();
 
     return () => {
-      // 销毁实例
+      // 组件卸载时销毁 ECharts 实例防止内存泄漏
       if (chartRef.current) {
         echarts.dispose(chartRef.current);
       }
@@ -106,9 +108,9 @@ const Heatmap: React.FC = () => {
   }, []);
 
   return (
-    <div className="w-full h-screen flex flex-col items-center justify-center">
+    <div className="w-full h-screen flex flex-col items-center justify-center bg-[#0f172a]">
       {loading && (
-        <div className="absolute z-10 text-cyan-400 animate-pulse">
+        <div className="absolute z-10 text-cyan-400 animate-pulse font-mono tracking-tighter">
           正在从 Arweave 节点同步地理数据...
         </div>
       )}
