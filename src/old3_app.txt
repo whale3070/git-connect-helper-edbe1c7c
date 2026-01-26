@@ -1,0 +1,39 @@
+import React from 'react'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+// 1. 引入你新创建的 Heatmap 页面
+import Home from './pages/Home'
+import MintConfirm from './pages/MintConfirm'
+import Success from './pages/Success'
+import Heatmap from './pages/Heatmap' // 确保路径匹配你的文件名
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <div className="min-h-screen bg-[#0f172a]"> 
+        <main>
+          <Routes>
+            {/* 首页：用于输入 Hash Code */}
+            <Route path="/" element={<Home />} />
+            
+            {/* 铸造确认页：自动填充地址并代付 Gas */}
+            <Route path="/valut_mint_nft/:hashCode" element={<MintConfirm />} />
+            
+            {/* 成功页：展示勋章编号和 Matrix 入口 */}
+            <Route path="/success" element={<Success />} />
+
+            {/* 新增：热力图展示页，方便出版社和读者查看销量分布 */}
+            <Route path="/heatmap" element={<Heatmap />} />
+
+            {/* 如果你想让原本删除的 admin 逻辑通过这个页面展示给出版社，也可以加个 alias */}
+            <Route path="/admin/distribution" element={<Heatmap />} />
+          </Routes>
+        </main>
+        
+        {/* 简洁的底部标识 */}
+        <footer className="mx-auto max-w-7xl px-4 py-8 text-center text-white/30 text-xs tracking-widest uppercase">
+          Whale Vault • Decentralized Identity System © {new Date().getFullYear()}
+        </footer>
+      </div>
+    </BrowserRouter>
+  )
+}

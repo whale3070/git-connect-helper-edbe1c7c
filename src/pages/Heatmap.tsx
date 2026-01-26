@@ -4,6 +4,7 @@ import * as echarts from 'echarts';
 const Heatmap: React.FC = () => {
   const chartRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     const initChart = async () => {
@@ -13,15 +14,16 @@ const Heatmap: React.FC = () => {
       const myChart = echarts.init(chartRef.current);
 
       try {
-        // 2. 加载世界地图 JSON (解决地图不显示的关键)
-        const geoJsonRes = await fetch('https://raw.githubusercontent.com/apache/echarts/master/test/data/map/json/world.json');
+        // 2. 加载本地世界地图 JSON (已修复下载到 public 目录后的加载路径)
+        // 路径使用 '/' 开头代表从 public 根目录读取
+        const geoJsonRes = await fetch('/world.json');
+        if (!geoJsonRes.ok) throw new Error("无法加载本地 world.json，请确认文件在 public 目录下");
         const worldGeoJson = await geoJsonRes.json();
         
         // 注册地图
         echarts.registerMap('world', worldGeoJson);
 
         // 3. 从您的 Go 后端获取热力图数据
-        // 提示：生产环境下建议使用相对路径或从 .env 获取 URL
         const dataRes = await fetch('http://192.168.47.130:8080/api/v1/analytics/distribution');
         const heatmapData = await dataRes.json();
 
@@ -29,45 +31,49 @@ const Heatmap: React.FC = () => {
         const option: echarts.EChartsOption = {
           backgroundColor: '#0f172a', // 与 App.tsx 保持一致的深蓝底色
           title: {
-            text: 'WHALE VAULT - 读者分布回响图',
+            text: 'WHALE VAULT - 全球读者回响分布',
             left: 'center',
-            top: '20',
+            top: '40',
             textStyle: {
-              color: 'rgba(255,255,255,0.8)',
+              color: '#22d3ee', // Cyan-400
               fontWeight: 'lighter',
-              letterSpacing: 2
+              letterSpacing: 4,
+              fontSize: 24
             }
           },
           tooltip: {
             show: true,
+            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+            borderColor: '#22d3ee',
+            textStyle: { color: '#fff' },
             formatter: (params: any) => {
-                return `地点: ${params.name}`;
+                return `<div style="padding:5px">回响地点: ${params.name}</div>`;
             }
           },
           visualMap: {
             min: 0,
-            max: 10,
+            max: 20,
             calculable: true,
             orient: 'horizontal',
             left: 'center',
-            bottom: '20',
+            bottom: '50',
             inRange: {
-              // 颜色跨度：从深蓝到电光青，最后到热力红
-              color: ['#003366', '#00ffcc', '#ffff00', '#ff3333']
+              // 颜色跨度：深蓝 -> 电光青 -> 亮黄 -> 热力红 (代表回响强度)
+              color: ['#0c4a6e', '#22d3ee', '#fbbf24', '#ef4444']
             },
-            textStyle: { color: '#fff' }
+            textStyle: { color: '#94a3b8' }
           },
           geo: {
             map: 'world',
-            roam: true, // 允许缩放和拖拽
+            roam: true, // 允许读者缩放和拖拽
             emphasis: {
               itemStyle: { areaColor: '#1e293b' },
               label: { show: false }
             },
             itemStyle: {
-              areaColor: '#1a1d23', // 陆地颜色
+              areaColor: '#111827', // 陆地颜色
               borderColor: '#334155', // 边界线颜色
-              borderWidth: 1
+              borderWidth: 0.8
             }
           },
           series: [
@@ -75,9 +81,10 @@ const Heatmap: React.FC = () => {
               name: 'Readers',
               type: 'heatmap',
               coordinateSystem: 'geo',
-              data: heatmapData || [], // 后端数据格式: [{name: "Beijing", value: [116.46, 39.92, 10]}]
-              pointSize: 10,
-              blurSize: 15
+              // 数据格式预期: [{name: "xxx", value: [lng, lat, count]}]
+              data: heatmapData && heatmapData.length > 0 ? heatmapData : [], 
+              pointSize: 12,
+              blurSize: 18
             }
           ]
         };
@@ -85,14 +92,15 @@ const Heatmap: React.FC = () => {
         myChart.setOption(option);
         setLoading(false);
 
-        // 响应式调整：窗口大小变化时重新绘制图表
+        // 响应式调整
         const handleResize = () => myChart.resize();
         window.addEventListener('resize', handleResize);
 
         return () => window.removeEventListener('resize', handleResize);
 
-      } catch (error) {
-        console.error('地图初始化失败:', error);
+      } catch (error: any) {
+        console.error('地图渲染异常:', error);
+        setErrorMsg(error.message);
         setLoading(false);
       }
     };
@@ -100,7 +108,6 @@ const Heatmap: React.FC = () => {
     initChart();
 
     return () => {
-      // 组件卸载时销毁 ECharts 实例防止内存泄漏
       if (chartRef.current) {
         echarts.dispose(chartRef.current);
       }
@@ -108,17 +115,39 @@ const Heatmap: React.FC = () => {
   }, []);
 
   return (
-    <div className="w-full h-screen flex flex-col items-center justify-center bg-[#0f172a]">
+    <div className="w-full h-screen relative flex items-center justify-center bg-[#0f172a]">
+      {/* 加载状态指示器 */}
       {loading && (
-        <div className="absolute z-10 text-cyan-400 animate-pulse font-mono tracking-tighter">
-          正在从 Arweave 节点同步地理数据...
+        <div className="absolute z-10 flex flex-col items-center">
+          <div className="w-12 h-12 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin mb-4"></div>
+          <div className="text-cyan-400 animate-pulse font-mono text-sm tracking-widest">
+            正在从 Arweave 节点同步读者确权数据...
+          </div>
         </div>
       )}
+
+      {/* 错误状态显示 */}
+      {errorMsg && (
+        <div className="absolute z-20 bg-red-900/20 border border-red-500/50 p-6 rounded-xl text-center">
+          <p className="text-red-400 mb-2">回响地图同步失败</p>
+          <p className="text-xs text-red-300/60 font-mono">{errorMsg}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="mt-4 text-xs bg-red-500/20 px-3 py-1 rounded hover:bg-red-500/40"
+          >
+            重试连接
+          </button>
+        </div>
+      )}
+
+      {/* 地图容器 */}
       <div 
         ref={chartRef} 
-        className="w-full h-full" 
-        style={{ minHeight: '600px' }}
+        className={`w-full h-full transition-opacity duration-1000 ${loading ? 'opacity-0' : 'opacity-100'}`} 
       />
+
+      {/* 装饰性遮罩：底部渐变 */}
+      <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-[#0f172a] to-transparent pointer-events-none" />
     </div>
   );
 };

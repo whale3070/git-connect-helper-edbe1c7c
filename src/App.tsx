@@ -1,58 +1,62 @@
-import React from 'react'
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
+import React from 'react';
+import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 
-// 导入页面组件
-import Home from './pages/Home'
-import MintConfirm from './pages/MintConfirm'
-import Success from './pages/Success'
-import Reward from './pages/Reward' 
+// 导入所有页面组件
+import Home from './pages/Home';
+import MintConfirm from './pages/MintConfirm';
+import Success from './pages/Success';
+import Reward from './pages/Reward';
 import Publisher from './pages/Publisher';
+import Heatmap from './pages/Heatmap'; // 新增：导入热力图组件
 
 export default function App() {
   return (
     <BrowserRouter>
-      {/* 使用 flex-col 并设置 min-h-screen 确保容器有高度且背景统一 */}
+      {/* 统一背景与布局 */}
       <div className="min-h-screen bg-[#0f172a] flex flex-col text-white"> 
         <main className="flex-grow">
           <Routes>
-            {/* 首页：用于手动输入 Hash Code */}
+            {/* 1. 首页：引导扫码 */}
             <Route path="/" element={<Home />} />
             
-            {/* 铸造确认页：扫码进入后自动填充地址并由后端代付 Gas */}
+            {/* 2. 铸造确权页：一书一码一钱包 */}
             <Route path="/valut_mint_nft/:hashCode" element={<MintConfirm />} />
             
-            {/* 成功页：展示勋章编号、Matrix 社区入口及链上存证 */}
+            {/* 3. 成功反馈页：领取 NFT 后的着陆页 */}
             <Route path="/success" element={<Success />} />
 
-            {/* 奖励领取页：集齐 5 码换取 0.001 MON 返利 */}
+            {/* 4. 推荐返利页：5 码换返利功能 */}
             <Route path="/reward" element={<Reward />} />
 
-            {/* 出版社管理后台：查看热力图与销售统计 */}
+            {/* 5. 出版社管理后台 */}
             <Route path="/publisher-admin" element={<Publisher />} />
 
-            {/* 兜底路由：404 页面 */}
+            {/* 6. 全球读者回响热力图：可视化确权分布 */}
+            <Route path="/Heatmap" element={<Heatmap />} />
+
+            {/* 7. 404 兜底路由 */}
             <Route path="*" element={
-              <div className="p-10 text-center">
-                <h2 className="text-2xl font-bold text-red-400">404</h2>
-                <p className="text-slate-400 mt-2">页面未找到，请检查 URL 是否正确</p>
-                <Link to="/" className="text-blue-400 underline mt-4 block">返回首页</Link>
+              <div className="flex flex-col items-center justify-center h-[60vh]">
+                <h1 className="text-4xl font-bold text-cyan-500 mb-4">404</h1>
+                <p className="text-white/60">页面未找到，请检查扫码链接是否正确</p>
+                <Link to="/" className="mt-6 text-blue-400 underline">返回首页</Link>
               </div>
             } />
           </Routes>
         </main>
         
-        {/* 底部页脚：包含测试入口链接及版权信息 */}
-        <footer className="mx-auto max-w-7xl px-4 py-8 text-center border-t border-white/5 w-full">
-          <div className="mb-4">
-            <Link to="/reward" className="text-blue-400 hover:text-blue-300 text-sm underline">
-              测试入口：5 码换返利页面
+        {/* 页脚：包含系统标识与快速测试入口 */}
+        <footer className="mx-auto max-w-7xl px-4 py-8 text-center border-t border-white/5">
+          <div className="flex flex-wrap justify-center gap-6 mb-4 text-sm">
+            <Link to="/reward" className="text-blue-400 hover:text-blue-300 underline">
+              推荐奖励系统
+            </Link>
+            <Link to="/Heatmap" className="text-cyan-400 hover:text-cyan-300 underline">
+              全球读者分布
             </Link>
           </div>
-          <p className="text-white/30 text-[10px] tracking-[0.2em] uppercase">
-            Whale Vault • Decentralized Identity System © {new Date().getFullYear()}
-          </p>
-          <p className="text-blue-500/20 text-[9px] mt-1 font-mono">
-            Monad Hackathon 2026 Submission
+          <p className="text-white/30 text-xs tracking-widest uppercase">
+            Whale Vault • Monad Hackathon 2026 • Decentralized Identity System
           </p>
         </footer>
       </div>

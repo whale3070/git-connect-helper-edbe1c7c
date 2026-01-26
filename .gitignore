@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Dependency directories
 node_modules/
 
@@ -21,3 +22,17 @@ deploy.log
 
 # Optional: If you don't want to track the deployment script's temporary state
 # But usually whale-deploy.sh should be tracked.
+=======
+.env
+# 编译后的二进制文件（假设你编译出的文件名叫 server 或 backend）
+backend
+main
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# 依赖文件夹
+vendor/
+>>>>>>> 78d7fc46 (feat: 提交排行榜与 Reward 逻辑更新)

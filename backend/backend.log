@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 [15:34:54] 🚀 鲸鱼金库：完整功能版已启动。监听端口 :8080
 当前已加载子钱包数量: 20
 ⚠️  [Relayer #1] 余额不足 (0xD31dB331A2d7349337D686C89C995A4530e8ad2E)，尝试下一个...
@@ -11,3 +12,16 @@
 ⚠️  [Relayer #9] 余额不足 (0x912d33777ff28dBF3d0A67390c1B6b408D71135D)，尝试下一个...
 ⚠️  [Relayer #10] 余额不足 (0xA5eEB11162fa84AD90E7665Bb7f228eA85f231BF)，尝试下一个...
 ✅ [成功] 目标: 0x504c1d9fa46b1fa5186a7ea444b71e19b33b9765 | IP: 212.50.230.29 | Tx: 0x83bde3a13b4048a15ffc2438e397ce2fb054168c22a8f250939a2728d0ced7e6
+=======
+[GIN-debug] [WARNING] Creating an Engine instance with the Logger and Recovery middleware already attached.
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+[GIN-debug] GET    /secret/verify            --> main.main.func1 (4 handlers)
+🚀 Backend Running on :8080
+[GIN-debug] [WARNING] You trusted all proxies, this is NOT safe. We recommend you to set a value.
+Please check https://pkg.go.dev/github.com/gin-gonic/gin#readme-don-t-trust-all-proxies for details.
+[GIN-debug] Listening and serving HTTP on 0.0.0.0:8080
+>>>>>>> 78d7fc46 (feat: 提交排行榜与 Reward 逻辑更新)
