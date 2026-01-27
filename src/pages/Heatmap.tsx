@@ -115,7 +115,7 @@ const Heatmap: React.FC = () => {
   }, []);
 
   return (
-    <div className="w-full h-screen relative flex items-center justify-center bg-[#0f172a]">
+    <div className="w-full h-full relative flex items-center justify-center bg-[#0f172a]">
       {/* 加载状态指示器 */}
       {loading && (
         <div className="absolute z-10 flex flex-col items-center">

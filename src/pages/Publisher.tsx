@@ -1,117 +1,167 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const Publisher: React.FC = () => {
-  const [count, setCount] = useState<number>(100);
-  const [loading, setLoading] = useState<boolean>(false);
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [opLoading, setOpLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // 书籍状态
+  const [bookName, setBookName] = useState<string>('');
+  const [author, setAuthor] = useState<string>('');
+  const [symbol, setSymbol] = useState<string>('');
+  const [contractAddr, setContractAddr] = useState<string | null>(null);
+  const [count, setCount] = useState<number>(100);
+  const [showRechargeGuide, setShowRechargeGuide] = useState<boolean>(false);
+  
+  // 出版社地址（从本地缓存获取）
+  const [pubAddress, setPubAddress] = useState<string>('');
 
-  const handleGenerateBatch = async () => {
-    if (count <= 0 || count > 500) {
-      setError("单次生成数量请保持在 1-500 之间");
+  // --- 核心：无感知准入检查 ---
+  useEffect(() => {
+    const authAddr = localStorage.getItem('vault_pub_auth');
+    const authRole = localStorage.getItem('vault_user_role');
+
+    if (!authAddr || authRole !== 'publisher') {
+      // 如果没有经过首页验证，或者角色不对，静默重定向
+      navigate('/', { replace: true });
+    } else {
+      setPubAddress(authAddr);
+      setLoading(false);
+    }
+  }, [navigate]);
+
+  // --- 部署合约逻辑 ---
+  const handleDeployContract = async () => {
+    if (!bookName || !symbol) {
+      setError("请完整填写书籍名称和代码");
       return;
     }
 
-    setLoading(true);
+    setOpLoading(true);
+    setError(null);
+    setShowRechargeGuide(false);
+
+    try {
+      const response = await fetch('http://192.168.47.130:8080/api/v1/factory/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: bookName,
+          author: author,
+          symbol: symbol.toUpperCase(),
+          address: pubAddress // 使用本地缓存的已验证地址
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.status === 402) {
+        setError(data.error);
+        setShowRechargeGuide(true);
+        return;
+      }
+
+      if (!data.ok) throw new Error(data.error || "部署失败");
+
+      setContractAddr(data.address);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setOpLoading(false);
+    }
+  };
+
+  // --- 批量生成码逻辑 ---
+  const handleGenerateBatch = async () => {
+    if (!contractAddr) return;
+    setOpLoading(true);
     setError(null);
 
     try {
-      // 这里的接口地址对应你在 main.go 中注册的路由
-      const apiUrl = `http://192.168.47.130:8080/admin/generate?count=${count}`;
-      
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-      });
-
-      if (!response.ok) {
-        throw new Error(`请求失败: ${response.statusText}`);
-      }
-
-      // 处理二进制文件流下载
+      const apiUrl = `http://192.168.47.130:8080/admin/generate?count=${count}&contract=${contractAddr}`;
+      const response = await fetch(apiUrl, { method: 'GET' });
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `WhaleVault_Codes_${count}_${new Date().getTime()}.zip`;
+      a.download = `${symbol}_Codes_${new Date().getTime()}.zip`;
       document.body.appendChild(a);
       a.click();
-      
-      // 清理资源
       window.URL.revokeObjectURL(url);
       a.remove();
     } catch (err: any) {
-      setError(err.message || "生成失败，请检查后端服务是否启动");
+      setError(err.message || "生成失败");
     } finally {
-      setLoading(false);
+      setOpLoading(false);
     }
   };
+
+  // 验证中显示黑色背景，防止 UI 闪现
+  if (loading) {
+    return <div className="min-h-screen bg-[#0b0e11]"></div>;
+  }
 
   return (
     <div className="min-h-screen bg-[#0f172a] text-white flex flex-col items-center justify-center p-4">
       <div className="max-w-md w-full bg-[#1e293b] p-8 rounded-3xl border border-white/10 shadow-2xl">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-black bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
-            出版社后台系统
+          <h1 className="text-2xl font-black bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent italic">
+            PUBLISHER TERMINAL
           </h1>
-          <p className="text-slate-400 text-sm mt-2">批量生成正版书码二维码 ZIP 包</p>
+          <p className="text-slate-500 text-[10px] uppercase tracking-widest mt-1">
+            已验证出版社: {pubAddress.slice(0, 6)}...{pubAddress.slice(-4)}
+          </p>
         </div>
 
-        <div className="space-y-6">
-          <div>
-            <label className="block text-xs uppercase tracking-widest text-slate-500 mb-3 ml-1">
-              拟出版新书数量
-            </label>
+        <div className="space-y-4">
+          <div className="p-5 bg-white/5 rounded-2xl border border-white/5 space-y-3">
+            <p className="text-[10px] uppercase text-cyan-400 font-bold">Step 1: 录入书籍信息</p>
             <input 
-              type="number" 
-              value={count}
-              onChange={(e) => setCount(Math.max(0, parseInt(e.target.value) || 0))}
-              className="w-full bg-[#0f172a] border border-white/10 rounded-2xl px-6 py-4 text-3xl font-mono focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+              placeholder="书籍名称" 
+              className="w-full bg-[#0f172a] border border-white/10 rounded-xl px-4 py-2 text-sm outline-none focus:border-cyan-500"
+              value={bookName} onChange={(e) => setBookName(e.target.value)}
             />
+            <input 
+              placeholder="书籍代码 (Symbol)" 
+              className="w-full bg-[#0f172a] border border-white/10 rounded-xl px-4 py-2 text-sm outline-none focus:border-cyan-500"
+              value={symbol} onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+            />
+            <button 
+              onClick={handleDeployContract}
+              disabled={opLoading || !!contractAddr}
+              className={`w-full py-3 rounded-xl text-xs font-bold transition-all ${
+                contractAddr ? 'bg-green-500/20 text-green-400' : 'bg-white text-black hover:bg-slate-200'
+              }`}
+            >
+              {opLoading ? '处理中...' : contractAddr ? '✓ 合约已部署' : '部署书籍合约 (10 CFX)'}
+            </button>
           </div>
 
-          {error && (
-            <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl text-sm">
+          {showRechargeGuide && (
+            <div className="p-3 bg-orange-500/10 border border-orange-500/20 rounded-xl text-[11px] text-orange-300">
               ⚠️ {error}
             </div>
           )}
 
-          <button 
-            onClick={handleGenerateBatch}
-            disabled={loading}
-            className={`w-full py-4 rounded-2xl font-bold text-lg transition-all active:scale-95 shadow-xl ${
-              loading 
-                ? 'bg-slate-700 cursor-not-allowed' 
-                : 'bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 shadow-blue-500/20'
-            }`}
-          >
-            {loading ? (
-              <span className="flex items-center justify-center gap-2">
-                <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                正在打包生成...
-              </span>
-            ) : (
-              '一键生成并下载 ZIP'
-            )}
-          </button>
-        </div>
-
-        <div className="mt-8 pt-6 border-t border-white/5 space-y-2">
-          <div className="flex items-center gap-2 text-[10px] text-slate-500">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-            自动同步至 Redis vault:codes:valid 池
-          </div>
-          <div className="flex items-center gap-2 text-[10px] text-slate-500">
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
-            二维码包含 /valut_mint_nft 验证跳转
+          <div className={`p-5 rounded-2xl border transition-all ${contractAddr ? 'bg-white/5 border-white/10' : 'opacity-20 pointer-events-none'}`}>
+            <p className="text-[10px] uppercase text-cyan-400 font-bold mb-3">Step 2: 生成激活码</p>
+            <input 
+              type="number" 
+              value={count}
+              onChange={(e) => setCount(parseInt(e.target.value) || 0)}
+              className="w-full bg-[#0f172a] border border-white/10 rounded-xl px-4 py-3 text-2xl font-mono outline-none"
+            />
+            <button 
+              onClick={handleGenerateBatch}
+              className="w-full mt-4 py-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 font-bold text-xs"
+            >
+              生成并下载 ZIP
+            </button>
           </div>
         </div>
       </div>
-      
-      <p className="mt-6 text-slate-600 text-[10px] uppercase tracking-tighter">
-        Whale Vault Protocol v1.0 • Publisher MVP Mode
-      </p>
     </div>
   );
 };

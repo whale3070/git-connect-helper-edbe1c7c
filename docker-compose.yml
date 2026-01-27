@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  # Redis 数据库 [cite: 2026-01-27]
+  redis:
+    image: redis:7-alpine
+    container_name: whale-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  # 后端服务
+  backend:
+    build: ./backend
+    container_name: whale-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - REDIS_ADDR=redis:6379 # 🌟 核心：通过 Docker 内部网络连接 Redis
+    depends_on:
+      - redis
+
+  # 前端服务
+  frontend:
+    build: .
+    container_name: whale-frontend
+    ports:
+      - "3000:80" # 访问本地 3000 端口即可看到前端
+    depends_on:
+      - backend
+
+volumes:
+  redis_data:

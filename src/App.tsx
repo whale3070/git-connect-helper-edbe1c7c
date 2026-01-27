@@ -3,63 +3,102 @@ import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 
 // 导入所有页面组件
 import Home from './pages/Home';
-import MintConfirm from './pages/MintConfirm';
 import Success from './pages/Success';
 import Reward from './pages/Reward';
 import Publisher from './pages/Publisher';
-import Heatmap from './pages/Heatmap'; // 新增：导入热力图组件
+import Heatmap from './pages/Heatmap';
+import Bookshelf from './pages/Bookshelf'; 
+import BookDetail from './pages/BookDetail'; 
+import VerifyPage from './pages/VerifyPage'; 
+// 关键：必须导入 MintConfirm 组件
+import MintConfirm from './pages/MintConfirm'; 
 
 export default function App() {
+  
+  /**
+   * 核心验证逻辑：对接后端 verify 接口
+   */
+  const handleVerify = async (addr: string, hash: string) => {
+    try {
+      if (!addr || !hash) {
+        console.warn("HandleVerify: 地址或哈希缺失", { addr, hash });
+        return null;
+      }
+
+      const response = await fetch(`http://192.168.47.130:8080/secret/verify?address=${addr}&codeHash=${hash}`);
+      
+      if (!response.ok) {
+        console.error("验证接口返回错误状态:", response.status);
+        return null;
+      }
+
+      const data = await response.json();
+      return data.ok ? data.role : null;
+    } catch (err) {
+      console.error("验证接口连接异常", err);
+      return null;
+    }
+  };
+
   return (
     <BrowserRouter>
-      {/* 统一背景与布局 */}
-      <div className="min-h-screen bg-[#0f172a] flex flex-col text-white"> 
-        <main className="flex-grow">
+      <div className="min-h-screen bg-[#0b0e11] flex flex-col text-[#d1d4dc]"> 
+        
+        <main style={{ minHeight: '80vh', position: 'relative', flexGrow: 1 }}>
           <Routes>
-            {/* 1. 首页：引导扫码 */}
             <Route path="/" element={<Home />} />
-            
-            {/* 2. 铸造确权页：一书一码一钱包 */}
-            <Route path="/valut_mint_nft/:hashCode" element={<MintConfirm />} />
-            
-            {/* 3. 成功反馈页：领取 NFT 后的着陆页 */}
+            <Route path="/bookshelf" element={<Bookshelf />} />
+
+            {/* --- 核心修复：注册独立的铸造执行路径 --- */}
+            {/* 这里的 path 必须使用 :hashCode，以匹配 MintConfirm 中的 useParams() */}
+            <Route path="/mint/:hashCode" element={<MintConfirm />} />
+
+            {/* 金库路径确权 (第一入口：用于身份识别、博弈弹窗) */}
+            <Route 
+              path="/vault_mint_nft/:hash" 
+              element={<VerifyPage onVerify={handleVerify} />} 
+            />
+            {/* 容错拼写 */}
+            <Route 
+              path="/valut_mint_nft/:hash" 
+              element={<VerifyPage onVerify={handleVerify} />} 
+            />
+
+            <Route path="/verify/:hash" element={<VerifyPage onVerify={handleVerify} />} />
+            <Route path="/verify" element={<VerifyPage onVerify={handleVerify} />} />
+
+            {/* 业务路由 */}
             <Route path="/success" element={<Success />} />
-
-            {/* 4. 推荐返利页：5 码换返利功能 */}
             <Route path="/reward" element={<Reward />} />
-
-            {/* 5. 出版社管理后台 */}
             <Route path="/publisher-admin" element={<Publisher />} />
-
-            {/* 6. 全球读者回响热力图：可视化确权分布 */}
             <Route path="/Heatmap" element={<Heatmap />} />
-
-            {/* 7. 404 兜底路由 */}
+            <Route path="/book/:address" element={<BookDetail />} />
+            
+            {/* 404 页面 */}
             <Route path="*" element={
               <div className="flex flex-col items-center justify-center h-[60vh]">
-                <h1 className="text-4xl font-bold text-cyan-500 mb-4">404</h1>
-                <p className="text-white/60">页面未找到，请检查扫码链接是否正确</p>
-                <Link to="/" className="mt-6 text-blue-400 underline">返回首页</Link>
+                <h1 className="text-4xl font-bold text-[#2962ff] mb-4">404</h1>
+                <p className="text-white/60 text-sm">TERMINAL ERROR: PATH NOT FOUND</p>
+                <Link to="/bookshelf" className="mt-6 text-[#2962ff] underline">返回大盘列表</Link>
               </div>
             } />
           </Routes>
         </main>
         
-        {/* 页脚：包含系统标识与快速测试入口 */}
-        <footer className="mx-auto max-w-7xl px-4 py-8 text-center border-t border-white/5">
-          <div className="flex flex-wrap justify-center gap-6 mb-4 text-sm">
-            <Link to="/reward" className="text-blue-400 hover:text-blue-300 underline">
-              推荐奖励系统
-            </Link>
-            <Link to="/Heatmap" className="text-cyan-400 hover:text-cyan-300 underline">
-              全球读者分布
-            </Link>
+        <footer className="bg-[#131722] border-t border-[#1e222d] px-8 py-4">
+          <div className="max-w-[1600px] mx-auto flex justify-between items-center text-[10px] text-[#5d606b]">
+            <div className="flex gap-6">
+              <Link to="/bookshelf" className="hover:text-[#2962ff] uppercase tracking-tighter">Market</Link>
+              <Link to="/Heatmap" className="hover:text-[#2962ff] uppercase tracking-tighter">Global Echo</Link>
+              <Link to="/reward" className="hover:text-[#2962ff] uppercase tracking-tighter">Referral System</Link>
+              <Link to="/verify" className="hover:text-white uppercase tracking-tighter">🔐 Admin Portal</Link>
+            </div>
+            <div className="uppercase tracking-widest text-right">
+              Whale Vault Protocol • Terminal v1.1.2 • Monad Hackathon 2026
+            </div>
           </div>
-          <p className="text-white/30 text-xs tracking-widest uppercase">
-            Whale Vault • Monad Hackathon 2026 • Decentralized Identity System
-          </p>
         </footer>
       </div>
     </BrowserRouter>
-  )
+  );
 }
