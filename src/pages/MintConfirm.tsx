@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 
 // 统一配置后端基准地址
-const BACKEND_URL = 'http://192.168.47.130:8080';
+const BACKEND_URL = 'http://198.55.109.102:8080';
 
 export default function MintConfirm() {
   const { hashCode } = useParams() 

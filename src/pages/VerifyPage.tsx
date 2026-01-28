@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-const BACKEND_URL = "http://192.168.47.130:8080";
+const BACKEND_URL = "http://198.55.109.102:8080";
 
 interface VerifyPageProps {
   onVerify: (address: string, codeHash: string) => Promise<'publisher' | 'author' | 'reader' | null>;

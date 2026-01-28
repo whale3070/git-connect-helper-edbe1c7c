@@ -44,7 +44,7 @@ func (h *PublisherHandler) GenerateAndDownloadZip(w http.ResponseWriter, r *http
 		generatedCodes = append(generatedCodes, code)
 
 		// 构造二维码链接，确保指向前端 Mint 路由
-		qrUrl := fmt.Sprintf("http://192.168.47.130:5173/valut_mint_nft/%s", code)
+		qrUrl := fmt.Sprintf("http://198.55.109.102:5173/valut_mint_nft/%s", code)
 		qrPng, err := qrcode.Encode(qrUrl, qrcode.Medium, 256)
 		if err != nil {
 			continue

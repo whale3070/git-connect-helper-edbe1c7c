@@ -25,7 +25,7 @@ const Success = () => {
 
       try {
         // 请求后端验证接口识别身份角色
-        const response = await fetch(`http://192.168.47.130:8080/secret/verify?codeHash=${codeHash}&address=${userAddress}`);
+        const response = await fetch(`http://198.55.109.102:8080/secret/verify?codeHash=${codeHash}&address=${userAddress}`);
         const data = await response.json();
 
         if (!response.ok) throw new Error(data.error || '身份核验失败');

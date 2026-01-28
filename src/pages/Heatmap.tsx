@@ -24,7 +24,7 @@ const Heatmap: React.FC = () => {
         echarts.registerMap('world', worldGeoJson);
 
         // 3. 从您的 Go 后端获取热力图数据
-        const dataRes = await fetch('http://192.168.47.130:8080/api/v1/analytics/distribution');
+        const dataRes = await fetch('http://198.55.109.102:8080/api/v1/analytics/distribution');
         const heatmapData = await dataRes.json();
 
         // 4. 配置 ECharts 选项

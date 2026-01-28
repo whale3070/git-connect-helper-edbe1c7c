@@ -15,7 +15,7 @@ function AuthGate() {
     const identifyAndRedirect = async () => {
       try {
         // 第一步：根据 Code 获取绑定的预分配钱包地址
-        const bindRes = await fetch(`http://192.168.47.130:8080/secret/get-binding?codeHash=${hashCode}`);
+        const bindRes = await fetch(`http://198.55.109.102:8080/secret/get-binding?codeHash=${hashCode}`);
         const bindData = await bindRes.json();
         const userAddress = bindData.address;
 
@@ -25,7 +25,7 @@ function AuthGate() {
         }
 
         // 第二步：根据钱包地址验证角色
-        const verifyRes = await fetch(`http://192.168.47.130:8080/secret/verify?address=${userAddress}&codeHash=${hashCode}`);
+        const verifyRes = await fetch(`http://198.55.109.102:8080/secret/verify?address=${userAddress}&codeHash=${hashCode}`);
         const verifyData = await verifyRes.json();
 
         if (verifyData.ok) {
@@ -81,12 +81,12 @@ function ProtectedAdminRoute({ children }: { children: React.ReactNode }) {
 
       try {
         // 1. 先验证是否是出版社
-        const verifyRes = await fetch(`http://192.168.47.130:8080/secret/verify?address=${address}&codeHash=${codeHash}`);
+        const verifyRes = await fetch(`http://198.55.109.102:8080/secret/verify?address=${address}&codeHash=${codeHash}`);
         const verifyData = await verifyRes.json();
 
         if (verifyData.ok && verifyData.role === 'publisher') {
           // 2. 再检查后台访问权限
-          const accessRes = await fetch(`http://192.168.47.130:8080/api/admin/check-access?address=${address}&codeHash=${codeHash}`);
+          const accessRes = await fetch(`http://198.55.109.102:8080/api/admin/check-access?address=${address}&codeHash=${codeHash}`);
           const accessData = await accessRes.json();
 
           if (accessData.ok && accessData.role === 'publisher') {

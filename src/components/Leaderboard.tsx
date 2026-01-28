@@ -12,7 +12,7 @@ const Leaderboard: React.FC = () => {
   const fetchLeaderboard = async () => {
     try {
       // 请求后端统计接口（不带 address 参数获取全量）
-      const res = await fetch('http://192.168.47.130:8080/relay/stats');
+      const res = await fetch('http://198.55.109.102:8080/relay/stats');
       const data = await res.json();
       
       if (data.ok && data.all_stats) {

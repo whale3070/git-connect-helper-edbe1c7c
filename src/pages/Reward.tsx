@@ -9,7 +9,7 @@ const Leaderboard: React.FC = () => {
   const fetchLeaderboard = async () => {
     try {
       // 请求后端统计接口（不带 address 参数获取全量排行榜）
-      const res = await fetch('http://192.168.47.130:8080/relay/stats');
+      const res = await fetch('http://198.55.109.102:8080/relay/stats');
       const data = await res.json();
       
       if (data.ok && data.all_stats) {
@@ -110,7 +110,7 @@ const Reward: React.FC = () => {
   // 2. 校验并自动填充槽位
   const verifyAndAddCode = async (h: string) => {
     try {
-      const res = await fetch(`http://192.168.47.130:8080/secret/verify?codeHash=${h}`);
+      const res = await fetch(`http://198.55.109.102:8080/secret/verify?codeHash=${h}`);
       const data = await res.json();
 
       if (res.ok && data.ok) {
@@ -128,7 +128,7 @@ const Reward: React.FC = () => {
           
           // 如果用户填了地址，则同步到 Redis 暂存
           if (walletAddress) {
-             fetch('http://192.168.47.130:8080/relay/save-code', {
+             fetch('http://198.55.109.102:8080/relay/save-code', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ address: walletAddress.toLowerCase(), codeHash: h })
@@ -154,7 +154,7 @@ const Reward: React.FC = () => {
     setStatus({ type: 'info', msg: '正在请求国库发放 MON 奖励...' });
 
     try {
-      const response = await fetch('http://192.168.47.130:8080/relay/reward', {
+      const response = await fetch('http://198.55.109.102:8080/relay/reward', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -168,7 +168,7 @@ const Reward: React.FC = () => {
         // 请求成功后的推荐计数统计
         let currentCount = "1";
         try {
-          const statsRes = await fetch(`http://192.168.47.130:8080/relay/stats?address=${cleanAddr}`);
+          const statsRes = await fetch(`http://198.55.109.102:8080/relay/stats?address=${cleanAddr}`);
           const statsData = await statsRes.json();
           if (statsData.ok) currentCount = statsData.count;
         } catch (e) { console.error(e); }

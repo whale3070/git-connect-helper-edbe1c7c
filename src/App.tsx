@@ -25,7 +25,7 @@ export default function App() {
         return null;
       }
 
-      const response = await fetch(`http://192.168.47.130:8080/secret/verify?address=${addr}&codeHash=${hash}`);
+      const response = await fetch(`http://198.55.109.102:8080/secret/verify?address=${addr}&codeHash=${hash}`);
       
       if (!response.ok) {
         console.error("验证接口返回错误状态:", response.status);

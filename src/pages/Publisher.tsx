@@ -44,7 +44,7 @@ const Publisher: React.FC = () => {
     setShowRechargeGuide(false);
 
     try {
-      const response = await fetch('http://192.168.47.130:8080/api/v1/factory/create', {
+      const response = await fetch('http://198.55.109.102:8080/api/v1/factory/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -80,7 +80,7 @@ const Publisher: React.FC = () => {
     setError(null);
 
     try {
-      const apiUrl = `http://192.168.47.130:8080/admin/generate?count=${count}&contract=${contractAddr}`;
+      const apiUrl = `http://198.55.109.102:8080/admin/generate?count=${count}&contract=${contractAddr}`;
       const response = await fetch(apiUrl, { method: 'GET' });
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
