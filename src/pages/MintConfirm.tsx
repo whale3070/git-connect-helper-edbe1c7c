@@ -36,36 +36,53 @@ export default function MintConfirm() {
       try {
         const codeHash = await sha256Hex(code);
 
-        // 1. ⚡️ 关键修正：从脚本定义的 vault:bind: 结构中获取地址
-        // 后端 get-binding 接口需支持 HGET vault:bind:{codeHash} address [cite: 2026-01-27]
+        // 1. ⚡️ 获取绑定地址
         const bResp = await fetch(`${BACKEND_URL}/secret/get-binding?codeHash=${codeHash}`);
+        
+        if (!bResp.ok) {
+          console.error(`获取绑定失败: HTTP ${bResp.status} ${bResp.statusText}`);
+          navigate('/', { replace: true });
+          return;
+        }
+        
         const bData = await bResp.json();
         const addr = bData.address;
 
         if (!addr) {
           console.error("Redis 映射缺失 (Key: vault:bind:...)");
-          // 若地址未绑定，理智的做法是退回引导页 [cite: 2026-01-01]
           navigate('/', { replace: true });
           return;
         }
 
-        // 2. ⚡️ 瞬时广播：不等待 Block 确认，直接拿到 txHash [cite: 2026-01-13]
+        // 2. ⚡️ 发起 Mint 请求
         const mintResp = await fetch(`${BACKEND_URL}/relay/mint`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ dest: addr, codeHash: codeHash })
         });
         
+        if (!mintResp.ok) {
+          const errorText = await mintResp.text().catch(() => '');
+          console.error(`Mint 请求失败: HTTP ${mintResp.status} ${mintResp.statusText}`, errorText);
+          navigate('/', { replace: true });
+          return;
+        }
+        
         const mintData = await mintResp.json();
         
-        // 3. 🌟 终极跳转：携带所有身份参数进入 Success.tsx
-        // Success.tsx 会利用 codeHash 自动识别 Reader/Publisher
+        if (!mintData.txHash) {
+          console.error("Mint 响应缺少 txHash:", mintData);
+          navigate('/', { replace: true });
+          return;
+        }
+        
+        // 3. 🌟 跳转到成功页面
         const query = new URLSearchParams({
           book_id: bookIdRaw,
           address: addr,
-          txHash: mintData.txHash || '',
+          txHash: mintData.txHash,
           codeHash: codeHash,
-          token_id: '0'
+          token_id: mintData.tokenId?.toString() || '0'
         });
 
         navigate(`/success?${query.toString()}`, { replace: true });
