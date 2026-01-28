@@ -35,9 +35,8 @@ const Heatmap: React.FC = () => {
             left: 'center',
             top: '40',
             textStyle: {
-              color: '#22d3ee', // Cyan-400
+              color: '#22d3ee',
               fontWeight: 'lighter',
-              letterSpacing: 4,
               fontSize: 24
             }
           },

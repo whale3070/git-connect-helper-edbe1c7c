@@ -1,7 +1,6 @@
 // pages/AdminDashboard.tsx
 import React, { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
-import { ethers } from 'ethers';
 
 const AdminDashboard: React.FC = () => {
   const { address, isConnected } = useAccount();

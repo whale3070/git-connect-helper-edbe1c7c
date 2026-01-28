@@ -11,7 +11,7 @@ const DistributionMap: React.FC = () => {
       
       // 这里的 data 应该是从后端接口获取的
       // 格式：[{ name: '深圳', value: [114.05, 22.54, 1] }]
-      const mapData = [ /* 后端 IP 转坐标后的数据 */ ];
+      const mapData: Array<{ name: string; value: [number, number, number] }> = [];
 
       myChart.setOption({
         backgroundColor: 'transparent',
