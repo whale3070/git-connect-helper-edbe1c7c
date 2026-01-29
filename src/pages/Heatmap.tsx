@@ -42,9 +42,10 @@ const Heatmap: React.FC = () => {
     const newData = await fetchHeatmapData();
     if (newData) {
       chartInstance.current.setOption({
-        series: [{
-          data: newData
-        }]
+        series: [
+          { data: newData },
+          { data: newData }
+        ]
       });
     }
   }, [fetchHeatmapData]);
@@ -121,11 +122,34 @@ const Heatmap: React.FC = () => {
           series: [
             {
               name: 'Readers',
-              type: 'heatmap',
+              type: 'effectScatter',
               coordinateSystem: 'geo',
               data: heatmapData || [],
-              pointSize: 15,
-              blurSize: 20
+              symbolSize: (val: any) => Math.max(10, Math.min(30, (val[2] || 1) * 5)),
+              showEffectOn: 'render',
+              rippleEffect: {
+                brushType: 'stroke',
+                scale: 3,
+                period: 4
+              },
+              itemStyle: {
+                color: '#22d3ee',
+                shadowBlur: 10,
+                shadowColor: '#22d3ee'
+              },
+              zlevel: 1
+            },
+            {
+              name: 'ReaderPoints',
+              type: 'scatter',
+              coordinateSystem: 'geo',
+              data: heatmapData || [],
+              symbolSize: (val: any) => Math.max(6, Math.min(20, (val[2] || 1) * 3)),
+              itemStyle: {
+                color: '#fbbf24',
+                opacity: 0.8
+              },
+              zlevel: 2
             }
           ]
         };
