@@ -28,26 +28,49 @@ func (h *RelayHandler) GetDistribution(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
 
-	res, err := h.RDB.HGetAll(r.Context(), "vault:analytics:locations").Result()
-	if err != nil {
-		json.NewEncoder(w).Encode([]MapNode{})
-		return
-	}
-
+	// 从两个数据源读取: vault:analytics:locations (旧) 和 vault:heatmap:locations (新)
 	var data []MapNode
-	for key, countStr := range res {
-		parts := strings.Split(key, "|")
-		if len(parts) < 2 { continue }
-		coords := strings.Split(parts[1], ",")
-		lng, _ := strconv.ParseFloat(coords[0], 64)
-		lat, _ := strconv.ParseFloat(coords[1], 64)
-		cnt, _ := strconv.ParseFloat(countStr, 64)
+	
+	// 1. 读取旧格式数据
+	res, err := h.RDB.HGetAll(r.Context(), "vault:analytics:locations").Result()
+	if err == nil {
+		for key, countStr := range res {
+			parts := strings.Split(key, "|")
+			if len(parts) < 2 { continue }
+			coords := strings.Split(parts[1], ",")
+			lng, _ := strconv.ParseFloat(coords[0], 64)
+			lat, _ := strconv.ParseFloat(coords[1], 64)
+			cnt, _ := strconv.ParseFloat(countStr, 64)
 
-		data = append(data, MapNode{
-			Name:  parts[0],
-			Value: []float64{lng, lat, cnt},
-		})
+			data = append(data, MapNode{
+				Name:  parts[0],
+				Value: []float64{lng, lat, cnt},
+			})
+		}
 	}
+
+	// 2. 读取新格式数据 (vault:heatmap:locations)
+	// 格式: "城市_国家" -> "经度,纬度,计数"
+	newRes, err := h.RDB.HGetAll(r.Context(), "vault:heatmap:locations").Result()
+	if err == nil {
+		for key, value := range newRes {
+			parts := strings.Split(value, ",")
+			if len(parts) < 3 { continue }
+			lng, _ := strconv.ParseFloat(parts[0], 64)
+			lat, _ := strconv.ParseFloat(parts[1], 64)
+			cnt, _ := strconv.ParseFloat(parts[2], 64)
+			
+			// 城市名从 key 提取 (格式: "城市_国家")
+			cityName := strings.Split(key, "_")[0]
+			if cityName == "" { cityName = key }
+
+			data = append(data, MapNode{
+				Name:  cityName,
+				Value: []float64{lng, lat, cnt},
+			})
+		}
+	}
+
 	if data == nil { data = []MapNode{} }
 	json.NewEncoder(w).Encode(data)
 }

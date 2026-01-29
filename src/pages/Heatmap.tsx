@@ -1,38 +1,77 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as echarts from 'echarts';
 import { BACKEND_URL } from '../config/backend';
+import { RefreshCw } from 'lucide-react';
+
+const POLL_INTERVAL = 5000; // 5秒轮询一次
 
 const Heatmap: React.FC = () => {
   const chartRef = useRef<HTMLDivElement>(null);
+  const chartInstance = useRef<echarts.ECharts | null>(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [totalReaders, setTotalReaders] = useState<number>(0);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+
+  // 获取热力图数据
+  const fetchHeatmapData = useCallback(async () => {
+    try {
+      const dataRes = await fetch(`${BACKEND_URL}/api/v1/analytics/distribution`);
+      if (!dataRes.ok) throw new Error('获取数据失败');
+      const heatmapData = await dataRes.json();
+      
+      // 计算总读者数
+      const total = heatmapData.reduce((sum: number, item: any) => {
+        const count = item.value?.[2] || 0;
+        return sum + count;
+      }, 0);
+      setTotalReaders(total);
+      setLastUpdate(new Date());
+      
+      return heatmapData;
+    } catch (error) {
+      console.error('获取热力图数据失败:', error);
+      return null;
+    }
+  }, []);
+
+  // 更新图表数据
+  const updateChartData = useCallback(async () => {
+    if (!chartInstance.current) return;
+    
+    const newData = await fetchHeatmapData();
+    if (newData) {
+      chartInstance.current.setOption({
+        series: [{
+          data: newData
+        }]
+      });
+    }
+  }, [fetchHeatmapData]);
 
   useEffect(() => {
     const initChart = async () => {
       if (!chartRef.current) return;
 
       // 1. 初始化 ECharts 实例
-      const myChart = echarts.init(chartRef.current);
+      chartInstance.current = echarts.init(chartRef.current);
 
       try {
-        // 2. 加载本地世界地图 JSON (已修复下载到 public 目录后的加载路径)
-        // 路径使用 '/' 开头代表从 public 根目录读取
+        // 2. 加载世界地图 JSON
         const geoJsonRes = await fetch('/world.json');
-        if (!geoJsonRes.ok) throw new Error("无法加载本地 world.json，请确认文件在 public 目录下");
+        if (!geoJsonRes.ok) throw new Error("无法加载 world.json");
         const worldGeoJson = await geoJsonRes.json();
         
-        // 注册地图
         echarts.registerMap('world', worldGeoJson);
 
-        // 3. 从后端获取热力图数据
-        const dataRes = await fetch(`${BACKEND_URL}/api/v1/analytics/distribution`);
-        const heatmapData = await dataRes.json();
+        // 3. 获取初始热力图数据
+        const heatmapData = await fetchHeatmapData();
 
         // 4. 配置 ECharts 选项
         const option: echarts.EChartsOption = {
-          backgroundColor: '#0f172a', // 与 App.tsx 保持一致的深蓝底色
+          backgroundColor: '#0f172a',
           title: {
-            text: 'WHALE VAULT - 全球读者回响分布',
+            text: '🐋 WHALE VAULT - 全球读者回响分布',
             left: 'center',
             top: '40',
             textStyle: {
@@ -43,36 +82,39 @@ const Heatmap: React.FC = () => {
           },
           tooltip: {
             show: true,
-            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+            backgroundColor: 'rgba(15, 23, 42, 0.95)',
             borderColor: '#22d3ee',
             textStyle: { color: '#fff' },
             formatter: (params: any) => {
-                return `<div style="padding:5px">回响地点: ${params.name}</div>`;
+              const count = params.value?.[2] || 0;
+              return `<div style="padding:8px">
+                <div style="font-weight:bold;margin-bottom:4px">${params.name}</div>
+                <div style="color:#22d3ee">📖 ${count} 位读者已点亮</div>
+              </div>`;
             }
           },
           visualMap: {
             min: 0,
-            max: 20,
+            max: 50,
             calculable: true,
             orient: 'horizontal',
             left: 'center',
             bottom: '50',
             inRange: {
-              // 颜色跨度：深蓝 -> 电光青 -> 亮黄 -> 热力红 (代表回响强度)
               color: ['#0c4a6e', '#22d3ee', '#fbbf24', '#ef4444']
             },
             textStyle: { color: '#94a3b8' }
           },
           geo: {
             map: 'world',
-            roam: true, // 允许读者缩放和拖拽
+            roam: true,
             emphasis: {
               itemStyle: { areaColor: '#1e293b' },
               label: { show: false }
             },
             itemStyle: {
-              areaColor: '#111827', // 陆地颜色
-              borderColor: '#334155', // 边界线颜色
+              areaColor: '#111827',
+              borderColor: '#334155',
               borderWidth: 0.8
             }
           },
@@ -81,19 +123,18 @@ const Heatmap: React.FC = () => {
               name: 'Readers',
               type: 'heatmap',
               coordinateSystem: 'geo',
-              // 数据格式预期: [{name: "xxx", value: [lng, lat, count]}]
-              data: heatmapData && heatmapData.length > 0 ? heatmapData : [], 
-              pointSize: 12,
-              blurSize: 18
+              data: heatmapData || [],
+              pointSize: 15,
+              blurSize: 20
             }
           ]
         };
 
-        myChart.setOption(option);
+        chartInstance.current.setOption(option);
         setLoading(false);
 
         // 响应式调整
-        const handleResize = () => myChart.resize();
+        const handleResize = () => chartInstance.current?.resize();
         window.addEventListener('resize', handleResize);
 
         return () => window.removeEventListener('resize', handleResize);
@@ -107,21 +148,41 @@ const Heatmap: React.FC = () => {
 
     initChart();
 
+    // 设置轮询更新
+    const pollInterval = setInterval(updateChartData, POLL_INTERVAL);
+
     return () => {
-      if (chartRef.current) {
-        echarts.dispose(chartRef.current);
+      clearInterval(pollInterval);
+      if (chartInstance.current) {
+        chartInstance.current.dispose();
+        chartInstance.current = null;
       }
     };
-  }, []);
+  }, [fetchHeatmapData, updateChartData]);
 
   return (
     <div className="w-full h-full relative flex items-center justify-center bg-[#0f172a]">
+      {/* 实时统计面板 */}
+      <div className="absolute top-4 right-4 z-20 bg-slate-900/80 backdrop-blur-sm border border-cyan-500/30 rounded-xl p-4 space-y-2">
+        <div className="flex items-center gap-2 text-cyan-400">
+          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          <span className="text-xs uppercase tracking-wider">实时更新中</span>
+        </div>
+        <div className="text-3xl font-black text-white">{totalReaders}</div>
+        <div className="text-[10px] text-gray-400 uppercase">全球已点亮读者</div>
+        {lastUpdate && (
+          <div className="text-[9px] text-gray-500">
+            更新于 {lastUpdate.toLocaleTimeString()}
+          </div>
+        )}
+      </div>
+
       {/* 加载状态指示器 */}
       {loading && (
         <div className="absolute z-10 flex flex-col items-center">
           <div className="w-12 h-12 border-4 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin mb-4"></div>
           <div className="text-cyan-400 animate-pulse font-mono text-sm tracking-widest">
-            正在从 Arweave 节点同步读者确权数据...
+            正在从 Conflux 链同步读者确权数据...
           </div>
         </div>
       )}
@@ -146,7 +207,7 @@ const Heatmap: React.FC = () => {
         className={`w-full h-full transition-opacity duration-1000 ${loading ? 'opacity-0' : 'opacity-100'}`} 
       />
 
-      {/* 装饰性遮罩：底部渐变 */}
+      {/* 装饰性遮罩 */}
       <div className="absolute bottom-0 left-0 w-full h-32 bg-gradient-to-t from-[#0f172a] to-transparent pointer-events-none" />
     </div>
   );
