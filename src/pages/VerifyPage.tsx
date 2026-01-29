@@ -18,21 +18,39 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
   const [role, setRole] = useState<'publisher' | 'author' | 'reader' | null>(null);
   const [showDecisionModal, setShowDecisionModal] = useState(false);
 
+  // 新增：无效二维码状态
+  const [invalidCode, setInvalidCode] = useState(false);
+
   useEffect(() => {
     const initTerminal = async () => {
       if (!codeHash) return;
       try {
-        // 1. 角色预检
+        // 1. 先检查绑定是否存在
+        const bindResp = await fetch(`${BACKEND_URL}/secret/get-binding?codeHash=${codeHash}`);
+        
+        if (!bindResp.ok) {
+          const errorData = await bindResp.json().catch(() => ({}));
+          // 检测 "Binding not found" 或 404 状态
+          if (errorData.error?.includes('not found') || bindResp.status === 404) {
+            setInvalidCode(true);
+            setLoading(false);
+            return;
+          }
+        }
+        
+        const bindData = await bindResp.json();
+        if (!bindData.address) {
+          setInvalidCode(true);
+          setLoading(false);
+          return;
+        }
+        setTargetAddress(bindData.address);
+
+        // 2. 角色预检
         const preResp = await fetch(`${BACKEND_URL}/api/v1/precheck-code?codeHash=${codeHash}`);
         const preData = await preResp.json();
         setRole(preData.role);
 
-        // 2. 自动获取绑定地址 [cite: 2026-01-13]
-        const bindResp = await fetch(`${BACKEND_URL}/secret/get-binding?codeHash=${codeHash}`);
-        if (bindResp.ok) {
-          const bindData = await bindResp.json();
-          if (bindData.address) setTargetAddress(bindData.address);
-        }
       } catch (err) {
         setError("连接金库失败");
       } finally {
@@ -52,6 +70,49 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
     // 跳转到 App.tsx 中新定义的 MintConfirm 路径
     navigate(`/mint/${codeHash}`);
   };
+
+  // 无效二维码错误页面
+  if (invalidCode) {
+    return (
+      <div className="min-h-screen bg-[#0b0e11] flex flex-col items-center justify-center p-6">
+        <div className="max-w-sm w-full bg-[#131722] border border-white/10 rounded-[32px] p-8 text-center space-y-6 shadow-2xl">
+          
+          {/* 错误图标 */}
+          <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mx-auto border border-red-500/20">
+            <span className="text-red-500 text-4xl">✕</span>
+          </div>
+
+          {/* 错误标题 */}
+          <h1 className="text-xl font-bold text-white">无效的二维码</h1>
+
+          {/* 错误描述 */}
+          <p className="text-sm text-gray-400 leading-relaxed">
+            该二维码无效或已被使用。请确认您扫描的是正版商品附带的二维码。
+          </p>
+
+          {/* 提示信息 */}
+          <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-4">
+            <p className="text-xs text-yellow-500/80 font-medium">
+              ⚠️ 请购买正版商品以获取有效的激活二维码
+            </p>
+          </div>
+
+          {/* 返回按钮 */}
+          <button 
+            onClick={() => window.location.href = '/'}
+            className="w-full py-4 rounded-xl bg-white/5 text-white font-bold text-sm uppercase tracking-widest hover:bg-white/10 transition-all active:scale-95"
+          >
+            返回首页
+          </button>
+        </div>
+
+        {/* 底部标识 */}
+        <div className="mt-10 text-[9px] text-gray-600 uppercase tracking-[0.4em] font-medium">
+          Whale Vault Protocol <span className="mx-2">•</span> Physical Asset Provenance
+        </div>
+      </div>
+    );
+  }
 
   if (loading && !role) {
     return (
