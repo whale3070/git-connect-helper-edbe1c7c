@@ -13,7 +13,9 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -109,6 +111,10 @@ func main() {
 	r.HandleFunc("/relay/stats", relayH.GetReferrerStats).Methods("GET", "OPTIONS")
 	r.HandleFunc("/api/admin/check-access", checkAdminAccessHandler).Methods("GET", "OPTIONS")
 	r.HandleFunc("/api/v1/analytics/distribution", relayH.GetDistribution).Methods("GET", "OPTIONS")
+	
+	// 新增：NFT 统计 & 读者位置
+	r.HandleFunc("/api/v1/nft/total-minted", getTotalMintedHandler).Methods("GET", "OPTIONS")
+	r.HandleFunc("/api/v1/reader/location", getReaderLocationHandler).Methods("GET", "OPTIONS")
 
 	port := "8080"
 	fmt.Printf("🚀 Whale Vault 后端启动成功 (监听端口: %s)\n", port)
@@ -198,6 +204,16 @@ func mintHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 🌟 抓取读者 IP 并存入 Redis 热力图数据
+	clientIP := getClientIP(r)
+	if clientIP != "" {
+		// 存入 IP 集合用于热力图
+		rdb.SAdd(ctx, "vault:heatmap:ips", clientIP)
+		// 记录 IP 与时间戳
+		rdb.HSet(ctx, "vault:heatmap:ip_time", clientIP, time.Now().Unix())
+		fmt.Printf("📍 读者 IP 已记录: %s\n", clientIP)
+	}
+
 	txHash, err := executeMintLegacy(req.Dest)
 	if err != nil {
 		// 失败回滚到有效池
@@ -208,6 +224,102 @@ func mintHandler(w http.ResponseWriter, r *http.Request) {
 
 	rdb.SAdd(ctx, "vault:codes:used", req.CodeHash)
 	sendJSON(w, 200, CommonResponse{Ok: true, TxHash: txHash, Role: "reader"})
+}
+
+// 获取客户端真实 IP
+func getClientIP(r *http.Request) string {
+	// 优先检查代理头
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		parts := strings.Split(xff, ",")
+		return strings.TrimSpace(parts[0])
+	}
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return xri
+	}
+	// 直连情况
+	ip := r.RemoteAddr
+	if colonIdx := strings.LastIndex(ip, ":"); colonIdx != -1 {
+		ip = ip[:colonIdx]
+	}
+	return ip
+}
+
+// 获取链上 NFT 总铸造数量
+func getTotalMintedHandler(w http.ResponseWriter, r *http.Request) {
+	contractAddr := os.Getenv("CONTRACT_ADDR")
+	if contractAddr == "" {
+		sendJSON(w, 500, map[string]interface{}{"error": "CONTRACT_ADDR not configured"})
+		return
+	}
+
+	// 调用合约的 totalSales() 方法 - 方法签名: 0x7912d7c5
+	methodID := common.FromHex("0x7912d7c5")
+	
+	msg := ethereum.CallMsg{
+		To:   &common.Address{},
+		Data: methodID,
+	}
+	toAddr := common.HexToAddress(contractAddr)
+	msg.To = &toAddr
+
+	result, err := client.CallContract(ctx, msg, nil)
+	if err != nil {
+		fmt.Printf("❌ 查询 totalSales 失败: %v\n", err)
+		sendJSON(w, 500, map[string]interface{}{"error": err.Error()})
+		return
+	}
+
+	// 解析返回的 uint256
+	total := new(big.Int).SetBytes(result)
+	sendJSON(w, 200, map[string]interface{}{"total": total.Int64()})
+}
+
+// 获取读者地理位置（基于 IP）
+func getReaderLocationHandler(w http.ResponseWriter, r *http.Request) {
+	clientIP := getClientIP(r)
+	if clientIP == "" || clientIP == "127.0.0.1" || strings.HasPrefix(clientIP, "192.168.") {
+		sendJSON(w, 200, map[string]string{"city": "本地开发", "country": "CN"})
+		return
+	}
+
+	// 使用免费 IP 地理位置 API
+	resp, err := http.Get(fmt.Sprintf("http://ip-api.com/json/%s?lang=zh-CN", clientIP))
+	if err != nil {
+		sendJSON(w, 200, map[string]string{"city": "未知", "country": "未知"})
+		return
+	}
+	defer resp.Body.Close()
+
+	var geoData struct {
+		City    string `json:"city"`
+		Region  string `json:"regionName"`
+		Country string `json:"country"`
+		Lat     float64 `json:"lat"`
+		Lon     float64 `json:"lon"`
+	}
+	json.NewDecoder(resp.Body).Decode(&geoData)
+
+	// 同时存入热力图坐标数据
+	if geoData.Lat != 0 && geoData.Lon != 0 {
+		locKey := fmt.Sprintf("%s_%s", geoData.City, geoData.Country)
+		// 存储格式: "城市_国家" -> "经度,纬度,计数"
+		existingData, _ := rdb.HGet(ctx, "vault:heatmap:locations", locKey).Result()
+		count := 1
+		if existingData != "" {
+			parts := strings.Split(existingData, ",")
+			if len(parts) == 3 {
+				oldCount, _ := strconv.Atoi(parts[2])
+				count = oldCount + 1
+			}
+		}
+		rdb.HSet(ctx, "vault:heatmap:locations", locKey, fmt.Sprintf("%f,%f,%d", geoData.Lon, geoData.Lat, count))
+	}
+
+	sendJSON(w, 200, map[string]string{
+		"city":    geoData.City,
+		"region":  geoData.Region,
+		"country": geoData.Country,
+	})
 }
 
 // --- 核心修复：调用 NFT 合约的 mint(address to) 方法 ---
