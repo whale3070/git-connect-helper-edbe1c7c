@@ -25,31 +25,29 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
     const initTerminal = async () => {
       if (!codeHash) return;
       try {
-        // 1. 先检查绑定是否存在
+        // 1. 先检查绑定是否存在，获取地址
         const bindResp = await fetch(`${BACKEND_URL}/secret/get-binding?codeHash=${codeHash}`);
-        
-        if (!bindResp.ok) {
-          const errorData = await bindResp.json().catch(() => ({}));
-          // 检测 "Binding not found" 或 404 状态
-          if (errorData.error?.includes('not found') || bindResp.status === 404) {
-            setInvalidCode(true);
-            setLoading(false);
-            return;
-          }
-        }
-        
         const bindData = await bindResp.json();
-        if (!bindData.address) {
+        
+        // 检测绑定是否有效
+        if (!bindData.address || bindData.address === '' || bindData.error) {
           setInvalidCode(true);
           setLoading(false);
           return;
         }
         setTargetAddress(bindData.address);
 
-        // 2. 角色预检
-        const preResp = await fetch(`${BACKEND_URL}/api/v1/precheck-code?codeHash=${codeHash}`);
-        const preData = await preResp.json();
-        setRole(preData.role);
+        // 2. 使用 /secret/verify 接口获取角色
+        const verifyResp = await fetch(`${BACKEND_URL}/secret/verify?codeHash=${codeHash}&address=${bindData.address}`);
+        const verifyData = await verifyResp.json();
+        
+        if (verifyData.ok && verifyData.role) {
+          // 后端返回的 role 可能是 "publisher", "author", "reader"
+          setRole(verifyData.role as 'publisher' | 'author' | 'reader');
+        } else {
+          // 验证失败，可能是无效的激活码
+          setInvalidCode(true);
+        }
 
       } catch (err) {
         setError("连接金库失败");
