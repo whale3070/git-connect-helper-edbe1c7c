@@ -98,20 +98,28 @@ const Publisher: React.FC = () => {
     setShowRechargeGuide(false);
 
     try {
-      const response = await fetch(`${BACKEND_URL}/api/v1/factory/create`, {
+      // 获取出版社的 codeHash
+      const codeHash = localStorage.getItem('vault_code_hash');
+      if (!codeHash) {
+        setError("缺少身份验证信息，请重新登录");
+        return;
+      }
+
+      const response = await fetch(`${BACKEND_URL}/api/v1/factory/deploy-book`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: bookName,
-          author: author,
+          codeHash: codeHash,
+          bookName: bookName,
+          authorName: author || '未知作者',
           symbol: symbol.toUpperCase(),
-          address: pubAddress
         }),
       });
 
       const data = await response.json();
 
-      if (response.status === 402) {
+      if (response.status === 400 && data.balance) {
+        // 余额不足
         setError(data.error);
         setShowRechargeGuide(true);
         return;
@@ -119,9 +127,10 @@ const Publisher: React.FC = () => {
 
       if (!data.ok) throw new Error(data.error || "部署失败");
 
-      setContractAddr(data.address);
+      // 部署成功，显示交易哈希
+      setContractAddr(data.txHash);
       // 刷新数据
-      fetchDashboardData();
+      setTimeout(() => fetchDashboardData(), 5000); // 等待链上确认
     } catch (err: any) {
       setError(err.message);
     } finally {
