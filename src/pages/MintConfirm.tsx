@@ -1,6 +1,5 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-
 // 统一配置后端基准地址
 const BACKEND_URL = 'http://198.55.109.102:8080';
 
@@ -8,6 +7,9 @@ export default function MintConfirm() {
   const { hashCode } = useParams() 
   const [params] = useSearchParams()
   const navigate = useNavigate()
+  
+  // 错误状态管理
+  const [error, setError] = useState<string | null>(null)
   
   // 核心：处理用户从 valut_mint_nft/<hashcode> 进来的请求
   const code = hashCode || params.get('code') || ''
@@ -39,18 +41,24 @@ export default function MintConfirm() {
         // 1. ⚡️ 获取绑定地址
         const bResp = await fetch(`${BACKEND_URL}/secret/get-binding?codeHash=${codeHash}`);
         
+        // 检查 HTTP 错误或 Binding not found
         if (!bResp.ok) {
+          const errorData = await bResp.json().catch(() => ({}));
+          if (errorData.error?.includes('not found') || bResp.status === 404) {
+            setError('INVALID_CODE');
+            return;
+          }
           console.error(`获取绑定失败: HTTP ${bResp.status} ${bResp.statusText}`);
-          navigate('/', { replace: true });
+          setError('NETWORK_ERROR');
           return;
         }
         
         const bData = await bResp.json();
         const addr = bData.address;
 
+        // 如果返回成功但地址为空，也视为无效二维码
         if (!addr) {
-          console.error("Redis 映射缺失 (Key: vault:bind:...)");
-          navigate('/', { replace: true });
+          setError('INVALID_CODE');
           return;
         }
 
@@ -64,7 +72,7 @@ export default function MintConfirm() {
         if (!mintResp.ok) {
           const errorText = await mintResp.text().catch(() => '');
           console.error(`Mint 请求失败: HTTP ${mintResp.status} ${mintResp.statusText}`, errorText);
-          navigate('/', { replace: true });
+          setError('MINT_FAILED');
           return;
         }
         
@@ -72,7 +80,7 @@ export default function MintConfirm() {
         
         if (!mintData.txHash) {
           console.error("Mint 响应缺少 txHash:", mintData);
-          navigate('/', { replace: true });
+          setError('MINT_FAILED');
           return;
         }
         
@@ -89,13 +97,68 @@ export default function MintConfirm() {
         
       } catch (e) {
         console.error("Vault sequence failed:", e);
-        navigate('/', { replace: true }); 
+        setError('NETWORK_ERROR');
       }
     };
 
     fastVaultRelay();
   }, [code, navigate, bookIdRaw]);
 
-  // 渲染 null：实现肉眼不可见的“秒转”逻辑中转
-  return null;
+  // 错误状态：显示友好的错误提示页面
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[#0b0e11] flex flex-col items-center justify-center p-6">
+        <div className="max-w-sm w-full bg-[#131722] border border-white/10 rounded-[32px] p-8 text-center space-y-6 shadow-2xl">
+          
+          {/* 错误图标 */}
+          <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mx-auto border border-red-500/20">
+            <span className="text-red-500 text-4xl">✕</span>
+          </div>
+
+          {/* 错误标题 */}
+          <h1 className="text-xl font-bold text-white">
+            {error === 'INVALID_CODE' ? '无效的二维码' : '请求失败'}
+          </h1>
+
+          {/* 错误描述 */}
+          <p className="text-sm text-gray-400 leading-relaxed">
+            {error === 'INVALID_CODE' 
+              ? '该二维码无效或已被使用。请确认您扫描的是正版商品附带的二维码。'
+              : '网络连接失败，请检查网络后重试。'}
+          </p>
+
+          {/* 提示信息 */}
+          {error === 'INVALID_CODE' && (
+            <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-4">
+              <p className="text-xs text-yellow-500/80 font-medium">
+                ⚠️ 请购买正版商品以获取有效的激活二维码
+              </p>
+            </div>
+          )}
+
+          {/* 返回按钮 */}
+          <button 
+            onClick={() => navigate('/', { replace: true })}
+            className="w-full py-4 rounded-xl bg-white/5 text-white font-bold text-sm uppercase tracking-widest hover:bg-white/10 transition-all active:scale-95"
+          >
+            返回首页
+          </button>
+        </div>
+
+        {/* 底部标识 */}
+        <div className="mt-10 text-[9px] text-gray-600 uppercase tracking-[0.4em] font-medium">
+          Whale Vault Protocol <span className="mx-2">•</span> Physical Asset Provenance
+        </div>
+      </div>
+    );
+  }
+
+  // 加载状态：显示加载动画
+  return (
+    <div className="min-h-screen bg-[#0b0e11] flex flex-col items-center justify-center">
+      <div className="animate-pulse text-blue-500 text-[10px] tracking-[0.3em] uppercase font-mono">
+        正在验证二维码...
+      </div>
+    </div>
+  );
 }
