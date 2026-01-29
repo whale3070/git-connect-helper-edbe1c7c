@@ -103,6 +103,8 @@ func main() {
 	r.HandleFunc("/api/v1/factory/verify-publisher", verifyPublisherHandler).Methods("GET", "OPTIONS")
 	r.HandleFunc("/api/v1/factory/create", createBookHandler).Methods("POST", "OPTIONS")
 	r.HandleFunc("/api/v1/tickers", marketH.GetTickers).Methods("GET", "OPTIONS")
+	r.HandleFunc("/api/v1/market/tickers", marketH.GetTickers).Methods("GET", "OPTIONS") // 添加完整路径
+	r.HandleFunc("/api/v1/factory/deploy-book", deployBookHandler).Methods("POST", "OPTIONS") // 出版社部署书籍
 	r.HandleFunc("/secret/get-binding", getBindingHandler).Methods("GET", "OPTIONS")
 	r.HandleFunc("/secret/verify", verifyHandler).Methods("GET", "OPTIONS")
 	r.HandleFunc("/relay/mint", mintHandler).Methods("POST", "OPTIONS")
@@ -437,3 +439,231 @@ func precheckCodeHandler(w http.ResponseWriter, r *http.Request) { sendJSON(w, 2
 func verifyPublisherHandler(w http.ResponseWriter, r *http.Request) { sendJSON(w, 200, CommonResponse{Ok: true}) }
 func createBookHandler(w http.ResponseWriter, r *http.Request) { sendJSON(w, 200, CommonResponse{Ok: true}) }
 func checkAdminAccessHandler(w http.ResponseWriter, r *http.Request) { sendJSON(w, 200, CommonResponse{Ok: true}) }
+
+// 出版社部署书籍合约
+func deployBookHandler(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		CodeHash   string `json:"codeHash"`   // 出版社的激活码哈希
+		BookName   string `json:"bookName"`   // 书籍名称
+		AuthorName string `json:"authorName"` // 作者名称
+		Symbol     string `json:"symbol"`     // 书籍代码
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		sendJSON(w, 400, map[string]interface{}{"ok": false, "error": "参数格式错误"})
+		return
+	}
+
+	// 1. 验证出版社身份
+	isPubCode, _ := rdb.SIsMember(ctx, "vault:roles:publishers_codes", req.CodeHash).Result()
+	if !isPubCode {
+		sendJSON(w, 403, map[string]interface{}{"ok": false, "error": "非出版社身份，无权部署"})
+		return
+	}
+
+	// 2. 从 Redis 获取出版社私钥
+	// 格式: vault:publisher:keys:{codeHash} -> {"privateKey": "xxx", "address": "0x..."}
+	pubData, err := rdb.HGetAll(ctx, "vault:publisher:keys:"+req.CodeHash).Result()
+	if err != nil || len(pubData) == 0 {
+		sendJSON(w, 500, map[string]interface{}{"ok": false, "error": "无法获取出版社密钥信息"})
+		return
+	}
+
+	privateKeyHex := pubData["privateKey"]
+	publisherAddress := pubData["address"]
+
+	if privateKeyHex == "" || publisherAddress == "" {
+		sendJSON(w, 500, map[string]interface{}{"ok": false, "error": "出版社密钥配置不完整"})
+		return
+	}
+
+	// 3. 解析私钥
+	privateKey, err := crypto.HexToECDSA(strings.TrimPrefix(privateKeyHex, "0x"))
+	if err != nil {
+		sendJSON(w, 500, map[string]interface{}{"ok": false, "error": "私钥格式无效"})
+		return
+	}
+
+	// 4. 检查余额是否足够（需要 1 CFX 部署费 + Gas）
+	pubAddr := common.HexToAddress(publisherAddress)
+	balance, err := client.BalanceAt(ctx, pubAddr, nil)
+	if err != nil {
+		sendJSON(w, 500, map[string]interface{}{"ok": false, "error": "无法查询余额: " + err.Error()})
+		return
+	}
+
+	// 需要至少 1.5 CFX (1 CFX 部署费 + 0.5 CFX Gas 预留)
+	minRequired := new(big.Int).Mul(big.NewInt(15), big.NewInt(1e17)) // 1.5 * 10^18
+	if balance.Cmp(minRequired) < 0 {
+		actualBalance := new(big.Float).Quo(new(big.Float).SetInt(balance), big.NewFloat(1e18))
+		sendJSON(w, 400, map[string]interface{}{
+			"ok":      false,
+			"error":   fmt.Sprintf("余额不足 (当前: %.4f CFX)，部署书籍合约需至少 1.5 CFX", actualBalance),
+			"balance": fmt.Sprintf("%.4f", actualBalance),
+		})
+		return
+	}
+
+	// 5. 构建调用工厂合约的交易
+	factoryAddr := os.Getenv("FACTORY_CONTRACT_ADDR")
+	if factoryAddr == "" {
+		factoryAddr = "0xfd19cc70af0a45d032df566ef8cc8027189fd5f3" // 默认工厂合约地址
+	}
+
+	// 获取 Relayer 地址（用于代付 Mint Gas）
+	relayerAddr := common.Address{}
+	if len(relayers) > 0 {
+		relayerAddr = relayers[0].Address
+	}
+
+	// 构建 ABI 编码的 calldata
+	// deployBook(string,string,string,string,address)
+	// 函数选择器: keccak256("deployBook(string,string,string,string,address)")[:4]
+	methodID := common.FromHex("0x3d4bd2ed") // deployBook 的函数选择器
+
+	// 手动编码参数（复杂，使用辅助函数）
+	callData := encodeDeployBookCall(req.BookName, req.Symbol, req.AuthorName, "https://arweave.net/metadata", relayerAddr)
+	if callData == nil {
+		sendJSON(w, 500, map[string]interface{}{"ok": false, "error": "编码交易数据失败"})
+		return
+	}
+
+	// 6. 获取 Nonce 和 Gas Price
+	nonce, err := client.PendingNonceAt(ctx, pubAddr)
+	if err != nil {
+		sendJSON(w, 500, map[string]interface{}{"ok": false, "error": "获取 Nonce 失败"})
+		return
+	}
+
+	gasPrice, err := client.SuggestGasPrice(ctx)
+	if err != nil {
+		sendJSON(w, 500, map[string]interface{}{"ok": false, "error": "获取 Gas 价格失败"})
+		return
+	}
+
+	// 7. 创建交易（发送 1 CFX 作为部署费）
+	deployFee := new(big.Int).Mul(big.NewInt(1), big.NewInt(1e18)) // 1 CFX
+	tx := types.NewTransaction(
+		nonce,
+		common.HexToAddress(factoryAddr),
+		deployFee,
+		uint64(3000000), // Gas Limit (部署合约需要更多)
+		gasPrice,
+		callData,
+	)
+
+	// 8. 签名交易
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), privateKey)
+	if err != nil {
+		sendJSON(w, 500, map[string]interface{}{"ok": false, "error": "签名交易失败: " + err.Error()})
+		return
+	}
+
+	// 9. 发送交易
+	err = client.SendTransaction(ctx, signedTx)
+	if err != nil {
+		sendJSON(w, 500, map[string]interface{}{"ok": false, "error": "发送交易失败: " + err.Error()})
+		return
+	}
+
+	txHash := signedTx.Hash().Hex()
+	fmt.Printf("📚 书籍合约部署中 | 出版社: %s | 书名: %s | TX: %s\n", publisherAddress, req.BookName, txHash)
+
+	// 10. 记录到 Redis 大盘（初始销量为 0）
+	bookKey := fmt.Sprintf("%s:%s:%s", req.Symbol, req.BookName, req.AuthorName)
+	rdb.HSet(ctx, "vault:books:pending", txHash, bookKey)
+
+	sendJSON(w, 200, map[string]interface{}{
+		"ok":        true,
+		"txHash":    txHash,
+		"status":    "PENDING",
+		"message":   "书籍合约部署交易已提交，请等待链上确认",
+		"bookName":  req.BookName,
+		"symbol":    req.Symbol,
+		"author":    req.AuthorName,
+		"publisher": publisherAddress,
+	})
+}
+
+// encodeDeployBookCall 编码 deployBook 函数调用
+func encodeDeployBookCall(bookName, symbol, authorName, baseURI string, relayer common.Address) []byte {
+	// 函数选择器: deployBook(string,string,string,string,address)
+	// 需要手动进行 ABI 编码
+
+	// 方法 ID (4 bytes)
+	methodID := common.FromHex("3d4bd2ed")
+
+	// 编码动态参数偏移量 (5 个参数: 4个string + 1个address)
+	// string 是动态类型，address 是静态类型
+	// 偏移量布局:
+	// [0-31]   string1 offset
+	// [32-63]  string2 offset
+	// [64-95]  string3 offset
+	// [96-127] string4 offset
+	// [128-159] address (静态，直接存值)
+	// [160+]   动态数据区
+
+	// 先计算各个偏移量
+	headerSize := 32 * 5 // 5个参数槽位
+
+	// 编码字符串函数
+	encodeString := func(s string) []byte {
+		strBytes := []byte(s)
+		// 长度 (32 bytes)
+		length := make([]byte, 32)
+		big.NewInt(int64(len(strBytes))).FillBytes(length)
+		// 数据 (填充到32字节倍数)
+		paddedLen := ((len(strBytes) + 31) / 32) * 32
+		data := make([]byte, paddedLen)
+		copy(data, strBytes)
+		return append(length, data...)
+	}
+
+	// 编码各个字符串
+	str1Data := encodeString(bookName)
+	str2Data := encodeString(symbol)
+	str3Data := encodeString(authorName)
+	str4Data := encodeString(baseURI)
+
+	// 计算偏移量
+	offset1 := headerSize
+	offset2 := offset1 + len(str1Data)
+	offset3 := offset2 + len(str2Data)
+	offset4 := offset3 + len(str3Data)
+
+	// 构建编码数据
+	result := make([]byte, 0)
+	result = append(result, methodID...)
+
+	// 偏移量1
+	off1Bytes := make([]byte, 32)
+	big.NewInt(int64(offset1)).FillBytes(off1Bytes)
+	result = append(result, off1Bytes...)
+
+	// 偏移量2
+	off2Bytes := make([]byte, 32)
+	big.NewInt(int64(offset2)).FillBytes(off2Bytes)
+	result = append(result, off2Bytes...)
+
+	// 偏移量3
+	off3Bytes := make([]byte, 32)
+	big.NewInt(int64(offset3)).FillBytes(off3Bytes)
+	result = append(result, off3Bytes...)
+
+	// 偏移量4
+	off4Bytes := make([]byte, 32)
+	big.NewInt(int64(offset4)).FillBytes(off4Bytes)
+	result = append(result, off4Bytes...)
+
+	// address (填充到32字节)
+	addrBytes := make([]byte, 32)
+	copy(addrBytes[12:], relayer.Bytes())
+	result = append(result, addrBytes...)
+
+	// 动态数据
+	result = append(result, str1Data...)
+	result = append(result, str2Data...)
+	result = append(result, str3Data...)
+	result = append(result, str4Data...)
+
+	return result
+}
