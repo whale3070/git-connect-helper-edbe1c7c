@@ -252,15 +252,14 @@ func getTotalMintedHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 调用合约的 totalSales() 方法 - 方法签名: 0x7912d7c5
-	methodID := common.FromHex("0x7912d7c5")
+	// 调用合约的 totalSales() 方法 - 方法签名: 7912d7c5 (不带0x前缀)
+	methodID := common.FromHex("7912d7c5")
 	
+	toAddr := common.HexToAddress(contractAddr)
 	msg := ethereum.CallMsg{
-		To:   &common.Address{},
+		To:   &toAddr,
 		Data: methodID,
 	}
-	toAddr := common.HexToAddress(contractAddr)
-	msg.To = &toAddr
 
 	result, err := client.CallContract(ctx, msg, nil)
 	if err != nil {
@@ -269,9 +268,12 @@ func getTotalMintedHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 解析返回的 uint256
-	total := new(big.Int).SetBytes(result)
-	sendJSON(w, 200, map[string]interface{}{"total": total.Int64()})
+	// 解析返回的 uint256 (处理空返回)
+	var total int64 = 0
+	if len(result) > 0 {
+		total = new(big.Int).SetBytes(result).Int64()
+	}
+	sendJSON(w, 200, map[string]interface{}{"total": total})
 }
 
 // 获取读者地理位置（基于 IP）
