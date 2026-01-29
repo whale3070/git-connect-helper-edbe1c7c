@@ -98,9 +98,10 @@ contract BookFactory {
             deployedAt: block.timestamp
         });
         
-        // 转账给平台
+        // 转账给平台 - 使用 call 替代 transfer
         if (msg.value > 0) {
-            payable(treasury).transfer(msg.value);
+            (bool success, ) = payable(treasury).call{value: msg.value}("");
+            require(success, "Transfer failed");
         }
         
         emit BookDeployed(bookAddress, msg.sender, bookName, symbol, authorName);
@@ -149,4 +150,9 @@ contract BookFactory {
         emit TreasuryUpdated(treasury, newTreasury);
         treasury = newTreasury;
     }
+
+    /**
+     * @dev 接收 ETH 的回退函数
+     */
+    receive() external payable {}
 }
