@@ -117,6 +117,9 @@ func main() {
 	// 新增：NFT 统计 & 读者位置
 	r.HandleFunc("/api/v1/nft/total-minted", getTotalMintedHandler).Methods("GET", "OPTIONS")
 	r.HandleFunc("/api/v1/reader/location", getReaderLocationHandler).Methods("GET", "OPTIONS")
+	
+	// 新增：出版社余额查询
+	r.HandleFunc("/api/v1/publisher/balance", getPublisherBalanceHandler).Methods("GET", "OPTIONS")
 
 	port := "8080"
 	fmt.Printf("🚀 Whale Vault 后端启动成功 (监听端口: %s)\n", port)
@@ -661,4 +664,57 @@ func encodeDeployBookCall(bookName, symbol, authorName, baseURI string, relayer 
 	result = append(result, str4Data...)
 
 	return result
+}
+
+// getPublisherBalanceHandler 查询出版社钱包余额
+func getPublisherBalanceHandler(w http.ResponseWriter, r *http.Request) {
+	codeHash := r.URL.Query().Get("codeHash")
+	if codeHash == "" {
+		sendJSON(w, 400, map[string]interface{}{"ok": false, "error": "缺少 codeHash 参数"})
+		return
+	}
+
+	// 从 Redis 获取出版社信息
+	pubData, err := rdb.HGetAll(ctx, "vault:bind:"+codeHash).Result()
+	if err != nil || len(pubData) == 0 {
+		sendJSON(w, 404, map[string]interface{}{"ok": false, "error": "未找到出版社信息"})
+		return
+	}
+
+	// 验证角色
+	if pubData["role"] != "publisher" {
+		sendJSON(w, 403, map[string]interface{}{"ok": false, "error": "非出版社账户"})
+		return
+	}
+
+	publisherAddress := pubData["address"]
+	if publisherAddress == "" {
+		sendJSON(w, 500, map[string]interface{}{"ok": false, "error": "出版社地址无效"})
+		return
+	}
+
+	// 查询链上余额
+	address := common.HexToAddress(publisherAddress)
+	balance, err := client.BalanceAt(ctx, address, nil)
+	if err != nil {
+		sendJSON(w, 500, map[string]interface{}{"ok": false, "error": "无法查询链上余额: " + err.Error()})
+		return
+	}
+
+	// 转换为 CFX (1 CFX = 10^18 Wei)
+	balanceFloat := new(big.Float).Quo(new(big.Float).SetInt(balance), big.NewFloat(1e18))
+	balanceCFX, _ := balanceFloat.Float64()
+
+	// 部署费用：1 CFX + 预估 Gas 费 ~0.5 CFX = 1.5 CFX
+	deployFee := 1.5
+	maxDeploys := int(balanceCFX / deployFee)
+
+	sendJSON(w, 200, map[string]interface{}{
+		"ok":          true,
+		"address":     publisherAddress,
+		"balance":     balanceCFX,
+		"balanceWei":  balance.String(),
+		"deployFee":   deployFee,
+		"maxDeploys":  maxDeploys,
+	})
 }
