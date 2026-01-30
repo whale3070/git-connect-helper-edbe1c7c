@@ -33,6 +33,11 @@ const Publisher: React.FC = () => {
   
   // 出版社地址（从本地缓存获取）
   const [pubAddress, setPubAddress] = useState<string>('');
+  
+  // 钱包余额状态
+  const [balanceCFX, setBalanceCFX] = useState<number>(0);
+  const [maxDeploys, setMaxDeploys] = useState<number>(0);
+  const [balanceLoading, setBalanceLoading] = useState<boolean>(true);
 
   // 销量数据
   const [bookSales, setBookSales] = useState<BookSales[]>([]);
@@ -53,9 +58,34 @@ const Publisher: React.FC = () => {
     }
   }, [navigate]);
 
+  // --- 获取出版社余额 ---
+  const fetchPublisherBalance = async () => {
+    setBalanceLoading(true);
+    try {
+      const codeHash = localStorage.getItem('vault_code_hash');
+      if (!codeHash) return;
+      
+      const res = await fetch(`${BACKEND_URL}/api/v1/publisher/balance?codeHash=${codeHash}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.ok) {
+          setBalanceCFX(data.balance || 0);
+          setMaxDeploys(data.maxDeploys || 0);
+        }
+      }
+    } catch (err) {
+      console.error('Balance fetch error:', err);
+    } finally {
+      setBalanceLoading(false);
+    }
+  };
+
   // --- 获取仪表盘数据 ---
   const fetchDashboardData = async () => {
     try {
+      // 先获取余额
+      fetchPublisherBalance();
+      
       // 获取书籍大盘数据
       const tickersRes = await fetch(`${BACKEND_URL}/api/v1/market/tickers?page=1`);
       if (tickersRes.ok) {
@@ -180,13 +210,40 @@ const Publisher: React.FC = () => {
       {/* 顶部导航栏 */}
       <header className="bg-[#131722] border-b border-white/5 px-6 py-4">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div>
-            <h1 className="text-xl font-black bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-              PUBLISHER TERMINAL
-            </h1>
-            <p className="text-[10px] text-slate-500 uppercase tracking-widest mt-0.5">
-              {pubAddress.slice(0, 6)}...{pubAddress.slice(-4)}
-            </p>
+          <div className="flex items-center gap-6">
+            <div>
+              <h1 className="text-xl font-black bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+                PUBLISHER TERMINAL
+              </h1>
+              <p className="text-[10px] text-slate-500 uppercase tracking-widest mt-0.5">
+                {pubAddress.slice(0, 6)}...{pubAddress.slice(-4)}
+              </p>
+            </div>
+            {/* 钱包余额显示 */}
+            <div className="flex items-center gap-4 px-4 py-2 bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 border border-emerald-500/20 rounded-xl">
+              <div className="text-center">
+                <p className="text-[10px] text-emerald-400/70 uppercase tracking-wider">CFX 余额</p>
+                <p className="text-lg font-bold text-emerald-400">
+                  {balanceLoading ? '...' : balanceCFX.toFixed(2)}
+                </p>
+              </div>
+              <div className="w-px h-8 bg-white/10"></div>
+              <div className="text-center">
+                <p className="text-[10px] text-cyan-400/70 uppercase tracking-wider">可部署次数</p>
+                <p className="text-lg font-bold text-cyan-400">
+                  {balanceLoading ? '...' : maxDeploys}
+                </p>
+              </div>
+              <button 
+                onClick={fetchPublisherBalance}
+                className="ml-2 p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-all"
+                title="刷新余额"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>
+            </div>
           </div>
           <div className="flex items-center gap-4">
             <div className="flex gap-2">
