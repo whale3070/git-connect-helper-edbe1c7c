@@ -513,7 +513,6 @@ func deployBookHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 使用零地址作为 Relayer（避免合约授权错误）
-	// 后续可以通过 setRelayerAuthorization 单独授权
 	zeroAddr := common.Address{} // 0x0000000000000000000000000000000000000000
 
 	// 手动编码参数
@@ -522,6 +521,10 @@ func deployBookHandler(w http.ResponseWriter, r *http.Request) {
 		sendJSON(w, 500, map[string]interface{}{"ok": false, "error": "编码交易数据失败"})
 		return
 	}
+
+	// 🔍 调试：打印完整 calldata，可用于对比 cast 输出
+	fmt.Printf("🔧 [DEBUG] 完整 calldata (hex): 0x%x\n", callData)
+	fmt.Printf("🔧 [DEBUG] 参数: bookName=%s, symbol=%s, author=%s\n", req.BookName, req.Symbol, req.AuthorName)
 
 	// 6. 获取 Nonce 和 Gas Price
 	nonce, err := client.PendingNonceAt(ctx, pubAddr)
