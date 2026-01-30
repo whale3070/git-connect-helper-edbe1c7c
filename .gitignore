@@ -36,3 +36,4 @@ main
 # 依赖文件夹
 vendor/
 >>>>>>> 78d7fc46 (feat: 提交排行榜与 Reward 逻辑更新)
+node_modules/
