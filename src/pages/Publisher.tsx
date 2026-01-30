@@ -63,18 +63,29 @@ const Publisher: React.FC = () => {
     setBalanceLoading(true);
     try {
       const codeHash = localStorage.getItem('vault_code_hash');
-      if (!codeHash) return;
+      console.log('[Publisher] Fetching balance with codeHash:', codeHash);
       
-      const res = await fetch(`${BACKEND_URL}/api/v1/publisher/balance?codeHash=${codeHash}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.ok) {
-          setBalanceCFX(data.balance || 0);
-          setMaxDeploys(data.maxDeploys || 0);
-        }
+      if (!codeHash) {
+        console.warn('[Publisher] No vault_code_hash in localStorage');
+        setBalanceLoading(false);
+        return;
+      }
+      
+      const url = `${BACKEND_URL}/api/v1/publisher/balance?codeHash=${codeHash}`;
+      console.log('[Publisher] Balance API URL:', url);
+      
+      const res = await fetch(url);
+      const data = await res.json();
+      console.log('[Publisher] Balance API response:', data);
+      
+      if (res.ok && data.ok) {
+        setBalanceCFX(data.balance || 0);
+        setMaxDeploys(data.maxDeploys || 0);
+      } else {
+        console.error('[Publisher] Balance API error:', data.error);
       }
     } catch (err) {
-      console.error('Balance fetch error:', err);
+      console.error('[Publisher] Balance fetch error:', err);
     } finally {
       setBalanceLoading(false);
     }

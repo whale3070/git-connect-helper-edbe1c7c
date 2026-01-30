@@ -669,37 +669,59 @@ func encodeDeployBookCall(bookName, symbol, authorName, baseURI string, relayer 
 // getPublisherBalanceHandler 查询出版社钱包余额
 func getPublisherBalanceHandler(w http.ResponseWriter, r *http.Request) {
 	codeHash := r.URL.Query().Get("codeHash")
+	fmt.Printf("📊 [Balance] 收到余额查询请求, codeHash: %s\n", codeHash)
+	
 	if codeHash == "" {
 		sendJSON(w, 400, map[string]interface{}{"ok": false, "error": "缺少 codeHash 参数"})
 		return
 	}
 
 	// 从 Redis 获取出版社信息
-	pubData, err := rdb.HGetAll(ctx, "vault:bind:"+codeHash).Result()
-	if err != nil || len(pubData) == 0 {
+	redisKey := "vault:bind:" + codeHash
+	fmt.Printf("📊 [Balance] 查询 Redis key: %s\n", redisKey)
+	
+	pubData, err := rdb.HGetAll(ctx, redisKey).Result()
+	if err != nil {
+		fmt.Printf("❌ [Balance] Redis 错误: %v\n", err)
+		sendJSON(w, 500, map[string]interface{}{"ok": false, "error": "Redis 查询失败: " + err.Error()})
+		return
+	}
+	
+	if len(pubData) == 0 {
+		fmt.Printf("❌ [Balance] Redis 未找到数据, key: %s\n", redisKey)
 		sendJSON(w, 404, map[string]interface{}{"ok": false, "error": "未找到出版社信息"})
 		return
 	}
+	
+	fmt.Printf("📊 [Balance] Redis 数据: %+v\n", pubData)
 
 	// 验证角色
-	if pubData["role"] != "publisher" {
-		sendJSON(w, 403, map[string]interface{}{"ok": false, "error": "非出版社账户"})
+	role := pubData["role"]
+	if role != "publisher" {
+		fmt.Printf("❌ [Balance] 角色不匹配: %s (期望 publisher)\n", role)
+		sendJSON(w, 403, map[string]interface{}{"ok": false, "error": "非出版社账户，当前角色: " + role})
 		return
 	}
 
 	publisherAddress := pubData["address"]
 	if publisherAddress == "" {
+		fmt.Printf("❌ [Balance] 地址为空\n")
 		sendJSON(w, 500, map[string]interface{}{"ok": false, "error": "出版社地址无效"})
 		return
 	}
+
+	fmt.Printf("📊 [Balance] 查询地址: %s\n", publisherAddress)
 
 	// 查询链上余额
 	address := common.HexToAddress(publisherAddress)
 	balance, err := client.BalanceAt(ctx, address, nil)
 	if err != nil {
+		fmt.Printf("❌ [Balance] 链上查询失败: %v\n", err)
 		sendJSON(w, 500, map[string]interface{}{"ok": false, "error": "无法查询链上余额: " + err.Error()})
 		return
 	}
+
+	fmt.Printf("📊 [Balance] 原始余额(Wei): %s\n", balance.String())
 
 	// 转换为 CFX (1 CFX = 10^18 Wei)
 	balanceFloat := new(big.Float).Quo(new(big.Float).SetInt(balance), big.NewFloat(1e18))
@@ -708,6 +730,8 @@ func getPublisherBalanceHandler(w http.ResponseWriter, r *http.Request) {
 	// 部署费用：1 CFX + 预估 Gas 费 ~0.5 CFX = 1.5 CFX
 	deployFee := 1.5
 	maxDeploys := int(balanceCFX / deployFee)
+
+	fmt.Printf("✅ [Balance] 查询成功: %.4f CFX, 可部署 %d 次\n", balanceCFX, maxDeploys)
 
 	sendJSON(w, 200, map[string]interface{}{
 		"ok":          true,
