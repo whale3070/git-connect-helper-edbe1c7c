@@ -512,14 +512,12 @@ func deployBookHandler(w http.ResponseWriter, r *http.Request) {
 		factoryAddr = "0xfd19cc70af0a45d032df566ef8cc8027189fd5f3" // 默认工厂合约地址
 	}
 
-	// 获取 Relayer 地址（用于代付 Mint Gas）
-	relayerAddr := common.Address{}
-	if len(relayers) > 0 {
-		relayerAddr = relayers[0].Address
-	}
+	// 使用零地址作为 Relayer（避免合约授权错误）
+	// 后续可以通过 setRelayerAuthorization 单独授权
+	zeroAddr := common.Address{} // 0x0000000000000000000000000000000000000000
 
-	// 手动编码参数（复杂，使用辅助函数）
-	callData := encodeDeployBookCall(req.BookName, req.Symbol, req.AuthorName, "https://arweave.net/metadata", relayerAddr)
+	// 手动编码参数
+	callData := encodeDeployBookCall(req.BookName, req.Symbol, req.AuthorName, "https://arweave.net/metadata", zeroAddr)
 	if callData == nil {
 		sendJSON(w, 500, map[string]interface{}{"ok": false, "error": "编码交易数据失败"})
 		return
