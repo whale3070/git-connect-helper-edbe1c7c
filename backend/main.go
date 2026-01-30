@@ -507,9 +507,9 @@ func deployBookHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 5. 构建调用工厂合约的交易
-	factoryAddr := os.Getenv("FACTORY_CONTRACT_ADDR")
+	factoryAddr := os.Getenv("FACTORY_ADDR")
 	if factoryAddr == "" {
-		factoryAddr = "0xfd19cc70af0a45d032df566ef8cc8027189fd5f3" // 默认工厂合约地址
+		factoryAddr = "0x4c9c8Ac267eb816B21ea81330962ecD73E80E68f" // 默认工厂合约地址
 	}
 
 	// 使用零地址作为 Relayer（避免合约授权错误）
