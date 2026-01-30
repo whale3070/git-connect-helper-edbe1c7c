@@ -1,2 +1,3 @@
 forge-std/=lib/forge-std/src/
 solady/=lib/solady/src/
+ERC721A/=../lib/ERC721A/contracts/

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "lib/ERC721A/contracts/ERC721A.sol";
+import "ERC721A/ERC721A.sol";
 
 /**
  * @title QuickNFT
