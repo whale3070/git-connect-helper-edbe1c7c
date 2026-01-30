@@ -460,15 +460,15 @@ func deployBookHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 2. 从 Redis 获取出版社私钥
-	// 格式: vault:publisher:keys:{codeHash} -> {"privateKey": "xxx", "address": "0x..."}
-	pubData, err := rdb.HGetAll(ctx, "vault:publisher:keys:"+req.CodeHash).Result()
+	// 2. 从 Redis 获取出版社私钥（金库协议统一存储格式）
+	// 格式: vault:bind:{codeHash} -> {"address": "0x...", "private_key": "xxx", "role": "publisher"}
+	pubData, err := rdb.HGetAll(ctx, "vault:bind:"+req.CodeHash).Result()
 	if err != nil || len(pubData) == 0 {
 		sendJSON(w, 500, map[string]interface{}{"ok": false, "error": "无法获取出版社密钥信息"})
 		return
 	}
 
-	privateKeyHex := pubData["privateKey"]
+	privateKeyHex := pubData["private_key"]
 	publisherAddress := pubData["address"]
 
 	if privateKeyHex == "" || publisherAddress == "" {
@@ -514,11 +514,6 @@ func deployBookHandler(w http.ResponseWriter, r *http.Request) {
 	if len(relayers) > 0 {
 		relayerAddr = relayers[0].Address
 	}
-
-	// 构建 ABI 编码的 calldata
-	// deployBook(string,string,string,string,address)
-	// 函数选择器: keccak256("deployBook(string,string,string,string,address)")[:4]
-	methodID := common.FromHex("0x3d4bd2ed") // deployBook 的函数选择器
 
 	// 手动编码参数（复杂，使用辅助函数）
 	callData := encodeDeployBookCall(req.BookName, req.Symbol, req.AuthorName, "https://arweave.net/metadata", relayerAddr)
