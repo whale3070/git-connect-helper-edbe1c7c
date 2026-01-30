@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BACKEND_URL } from '../config/backend';
+import { useBookFactory } from '@/hooks/useBookFactory';
+import { EXPLORER_URL } from '@/config/chain';
 
 // 书籍销量数据结构
 interface BookSales {
@@ -132,7 +134,10 @@ const Publisher: React.FC = () => {
     }
   };
 
-  // --- 部署合约逻辑 ---
+  // 使用 BookFactory Hook
+  const { deployBook, getExplorerLink, isLoading: walletLoading, error: walletError } = useBookFactory();
+
+  // --- 部署合约逻辑 (改为前端直连钱包) ---
   const handleDeployContract = async () => {
     if (!bookName || !symbol) {
       setError("请完整填写书籍名称和代码");
@@ -144,41 +149,28 @@ const Publisher: React.FC = () => {
     setShowRechargeGuide(false);
 
     try {
-      // 获取出版社的 codeHash
-      const codeHash = localStorage.getItem('vault_code_hash');
-      if (!codeHash) {
-        setError("缺少身份验证信息，请重新登录");
-        return;
-      }
-
-      const response = await fetch(`${BACKEND_URL}/api/v1/factory/deploy-book`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          codeHash: codeHash,
-          bookName: bookName,
-          authorName: author || '未知作者',
-          symbol: symbol.toUpperCase(),
-        }),
+      // 调用工厂合约部署新书 (通过 MetaMask)
+      const result = await deployBook({
+        bookName: bookName,
+        symbol: symbol.toUpperCase(),
+        authorName: author || '未知作者',
+        baseURI: 'https://arweave.net/metadata', // 默认元数据 URI
+        relayer: undefined // 不设置 relayer
       });
 
-      const data = await response.json();
-
-      if (response.status === 400 && data.balance) {
-        // 余额不足
-        setError(data.error);
-        setShowRechargeGuide(true);
-        return;
-      }
-
-      if (!data.ok) throw new Error(data.error || "部署失败");
-
       // 部署成功，显示交易哈希
-      setContractAddr(data.txHash);
+      setContractAddr(result.txHash);
       // 刷新数据
       setTimeout(() => fetchDashboardData(), 5000); // 等待链上确认
     } catch (err: any) {
-      setError(err.message);
+      if (err.message.includes('user rejected') || err.message.includes('User denied')) {
+        setError("用户取消了交易");
+      } else if (err.message.includes('insufficient funds')) {
+        setError("CFX 余额不足，请先充值");
+        setShowRechargeGuide(true);
+      } else {
+        setError(err.message || "部署失败");
+      }
     } finally {
       setOpLoading(false);
     }
