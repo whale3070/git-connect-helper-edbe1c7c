@@ -585,10 +585,11 @@ func deployBookHandler(w http.ResponseWriter, r *http.Request) {
 // encodeDeployBookCall 编码 deployBook 函数调用
 func encodeDeployBookCall(bookName, symbol, authorName, baseURI string, relayer common.Address) []byte {
 	// 函数选择器: deployBook(string,string,string,string,address)
+	// 计算方式: cast sig "deployBook(string,string,string,string,address)" = 0x7d9f6db5
 	// 需要手动进行 ABI 编码
 
-	// 方法 ID (4 bytes)
-	methodID := common.FromHex("3d4bd2ed")
+	// 方法 ID (4 bytes) - 正确的函数选择器
+	methodID := common.FromHex("7d9f6db5")
 
 	// 编码动态参数偏移量 (5 个参数: 4个string + 1个address)
 	// string 是动态类型，address 是静态类型
