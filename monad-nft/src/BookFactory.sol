@@ -9,26 +9,23 @@ import "./QuickNFT.sol";
  */
 contract BookFactory {
     // 收款地址（平台方）
-    address public treasury;
-    
+    address public treasury; [cite: 16]
     // 部署费用（单位：Wei）
-    uint256 public deployFee;
+    uint256 public deployFee; [cite: 17]
     
     // 所有已部署的书籍合约
-    address[] public deployedBooks;
-    
+    address[] public deployedBooks; [cite: 17]
     // 出版社地址 => 其部署的书籍合约列表
-    mapping(address => address[]) public publisherBooks;
-    
-    // 书籍合约地址 => 书籍信息
+    mapping(address => address[]) public publisherBooks; [cite: 18]
+
     struct BookInfo {
-        string name;
-        string symbol;
-        string author;
-        address publisher;
-        uint256 deployedAt;
+        string name; [cite: 19]
+        string symbol; [cite: 20]
+        string author; [cite: 20]
+        address publisher; [cite: 20]
+        uint256 deployedAt; [cite: 20]
     }
-    mapping(address => BookInfo) public bookInfo;
+    mapping(address => BookInfo) public bookInfo; [cite: 20]
 
     event BookDeployed(
         address indexed bookContract,
@@ -36,29 +33,18 @@ contract BookFactory {
         string name,
         string symbol,
         string author
-    );
-    
-    event DeployFeeUpdated(uint256 oldFee, uint256 newFee);
-    event TreasuryUpdated(address oldTreasury, address newTreasury);
+    ); [cite: 21]
+    event DeployFeeUpdated(uint256 oldFee, uint256 newFee); [cite: 22]
+    event TreasuryUpdated(address oldTreasury, address newTreasury); [cite: 22]
 
-    /**
-     * @dev 构造函数
-     * @param _treasury 收款地址
-     * @param _deployFee 部署费用（建议 10-50 CFX）
-     */
     constructor(address _treasury, uint256 _deployFee) {
-        require(_treasury != address(0), "Invalid treasury address");
-        treasury = _treasury;
-        deployFee = _deployFee;
+        require(_treasury != address(0), "Invalid treasury address"); [cite: 23]
+        treasury = _treasury; [cite: 24]
+        deployFee = _deployFee; [cite: 24]
     }
 
     /**
      * @dev 部署新书 NFT 合约
-     * @param bookName 书籍名称
-     * @param symbol 书籍代号（如 "BOOK001"）
-     * @param authorName 作者名称
-     * @param baseURI 元数据基础 URI
-     * @param relayer Relayer 地址（用于代付 Gas mint）
      */
     function deployBook(
         string memory bookName,
@@ -67,92 +53,68 @@ contract BookFactory {
         string memory baseURI,
         address relayer
     ) external payable returns (address) {
-        require(msg.value >= deployFee, "Insufficient deploy fee");
-        require(bytes(bookName).length > 0, "Book name required");
-        require(bytes(symbol).length > 0, "Symbol required");
-        
-        // 部署新的 QuickNFT 合约
+        require(msg.value >= deployFee, "Insufficient deploy fee"); [cite: 25]
+        require(bytes(bookName).length > 0, "Book name required"); [cite: 26]
+        require(bytes(symbol).length > 0, "Symbol required"); [cite: 26]
+
+        // 【关键修改】直接在部署时传入 relayer 参数
+        // 这样 QuickNFT 可以在构造函数里直接完成授权，不需要工厂后续调用
         QuickNFT newBook = new QuickNFT(
             bookName,
             symbol,
             authorName,
-            msg.sender,  // 出版社成为 Owner
-            baseURI
-        );
-        
-        address bookAddress = address(newBook);
-        
-        // 授权 Relayer
-        if (relayer != address(0)) {
-            newBook.setRelayerAuthorization(relayer, true);
-        }
+            msg.sender, // 出版社
+            baseURI,
+            relayer     // 新增参数
+        ); [cite: 27]
+
+        address bookAddress = address(newBook); [cite: 28]
         
         // 记录书籍信息
-        deployedBooks.push(bookAddress);
-        publisherBooks[msg.sender].push(bookAddress);
+        deployedBooks.push(bookAddress); [cite: 29]
+        publisherBooks[msg.sender].push(bookAddress); [cite: 30]
         bookInfo[bookAddress] = BookInfo({
             name: bookName,
             symbol: symbol,
             author: authorName,
             publisher: msg.sender,
             deployedAt: block.timestamp
-        });
-        
-        // 转账给平台 - 使用 call 替代 transfer
+        }); [cite: 30]
+
+        // 转账给平台
         if (msg.value > 0) {
-            (bool success, ) = payable(treasury).call{value: msg.value}("");
-            require(success, "Transfer failed");
+            (bool success, ) = payable(treasury).call{value: msg.value}(""); [cite: 31]
+            require(success, "Transfer failed"); [cite: 32]
         }
         
-        emit BookDeployed(bookAddress, msg.sender, bookName, symbol, authorName);
-        
-        return bookAddress;
+        emit BookDeployed(bookAddress, msg.sender, bookName, symbol, authorName); [cite: 32]
+        return bookAddress; [cite: 33]
     }
 
-    /**
-     * @dev 获取所有已部署书籍数量
-     */
     function totalBooks() external view returns (uint256) {
-        return deployedBooks.length;
+        return deployedBooks.length; [cite: 33]
     }
 
-    /**
-     * @dev 获取出版社部署的书籍列表
-     */
     function getPublisherBooks(address publisher) external view returns (address[] memory) {
-        return publisherBooks[publisher];
+        return publisherBooks[publisher]; [cite: 34]
     }
 
-    /**
-     * @dev 获取书籍销量（调用书籍合约的 totalSales）
-     */
     function getBookSales(address bookContract) external view returns (uint256) {
-        return QuickNFT(bookContract).totalSales();
+        return QuickNFT(bookContract).totalSales(); [cite: 35]
     }
 
-    // ========== 管理函数 ==========
-    
-    /**
-     * @dev 更新部署费用（仅平台方）
-     */
     function updateDeployFee(uint256 newFee) external {
-        require(msg.sender == treasury, "Only treasury");
-        emit DeployFeeUpdated(deployFee, newFee);
-        deployFee = newFee;
+        require(msg.sender == treasury, "Only treasury"); [cite: 36]
+        emit DeployFeeUpdated(deployFee, newFee); [cite: 37]
+        deployFee = newFee; [cite: 37]
     }
 
-    /**
-     * @dev 更新收款地址（仅当前收款方）
-     */
     function updateTreasury(address newTreasury) external {
-        require(msg.sender == treasury, "Only treasury");
-        require(newTreasury != address(0), "Invalid address");
-        emit TreasuryUpdated(treasury, newTreasury);
-        treasury = newTreasury;
+        require(msg.sender == treasury, "Only treasury"); [cite: 37]
+        require(newTreasury != address(0), "Invalid address"); [cite: 38]
+        emit TreasuryUpdated(treasury, newTreasury); [cite: 38]
+        treasury = newTreasury; [cite: 39]
     }
 
-    /**
-     * @dev 接收 ETH 的回退函数
-     */
-    receive() external payable {}
+    receive() external payable {} [cite: 39]
 }
