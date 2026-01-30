@@ -190,10 +190,15 @@ func getBindingHandler(w http.ResponseWriter, r *http.Request) {
 	h := r.URL.Query().Get("codeHash")
 	mapping, err := rdb.HGetAll(ctx, "vault:bind:"+h).Result()
 	if err != nil || len(mapping) == 0 {
-		sendJSON(w, http.StatusOK, map[string]string{"address": ""})
+		sendJSON(w, http.StatusOK, map[string]string{"address": "", "role": "", "private_key": ""})
 		return
 	}
-	sendJSON(w, http.StatusOK, map[string]string{"address": mapping["address"]})
+	// 返回完整绑定信息：address, role, private_key (用于出版社部署合约)
+	sendJSON(w, http.StatusOK, map[string]string{
+		"address":     mapping["address"],
+		"role":        mapping["role"],
+		"private_key": mapping["private_key"],
+	})
 }
 
 func verifyHandler(w http.ResponseWriter, r *http.Request) {
