@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/ecdsa"
-	"encoding/json"
 	"fmt"
 	"log"
 	"math/big"
@@ -11,58 +9,33 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
-	"sync/atomic"
-	"time"
 
-	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
 
-	"whale-vault/relay/internal/blockchain"
 	"whale-vault/relay/internal/handlers"
 )
 
-// --- 结构体定义 ---
-
-type Relayer struct {
-	PrivateKey *ecdsa.PrivateKey
-	Address    common.Address
-	mu         sync.Mutex // 保持并发安全
-}
-
-type CommonResponse struct {
-	Ok      bool   `json:"ok"`
-	Status  string `json:"status,omitempty"`
-	TxHash  string `json:"txHash,omitempty"`
-	Error   string `json:"error,omitempty"`
-	Role    string `json:"role,omitempty"`
-	Address string `json:"address,omitempty"`
-}
-
-// --- 全局变量 ---
-
+// ========================================
+// 全局变量
+// ========================================
 var (
-	ctx            = context.Background()
-	rdb            *redis.Client
-	client         *ethclient.Client
-	relayers       []*Relayer
-	relayerCounter uint64
-	chainID        *big.Int
-	relayH         *handlers.RelayHandler
-	marketH        *handlers.MarketHandler
-	factoryH       *blockchain.BookFactory
+	ctx     = context.Background()
+	rdb     *redis.Client
+	client  *ethclient.Client
+	chainID *big.Int
 )
 
 func main() {
+	// ========================================
+	// 1. 初始化基础环境
+	// ========================================
 	godotenv.Load()
 
-	// 1. 初始化 Redis
+	// 初始化 Redis
 	redisAddr := os.Getenv("REDIS_ADDR")
 	if redisAddr == "" {
 		redisAddr = "localhost:6379"
@@ -70,364 +43,150 @@ func main() {
 	rdb = redis.NewClient(&redis.Options{
 		Addr: redisAddr,
 	})
+	log.Println("✅ Redis 连接成功")
 
-	// 2. 初始化以太坊客户端
+	// 初始化以太坊客户端
 	var err error
 	client, err = ethclient.Dial(os.Getenv("RPC_URL"))
 	if err != nil {
-		log.Fatalf("RPC连接失败: %v", err)
+		log.Fatalf("❌ RPC 连接失败: %v", err)
 	}
+	log.Println("✅ 以太坊客户端连接成功")
 
+	// 解析 Chain ID
 	cidStr := os.Getenv("CHAIN_ID")
 	cInt, _ := strconv.ParseInt(cidStr, 10, 64)
 	chainID = big.NewInt(cInt)
 
-	loadRelayers()
+	// ========================================
+	// 2. 加载中继器钱包
+	// ========================================
+	handlers.LoadRelayers(client, chainID)
 
-	relayH = &handlers.RelayHandler{RDB: rdb, Client: client}
-	marketH = &handlers.MarketHandler{RDB: rdb}
-	factoryH = &blockchain.BookFactory{RDB: rdb, Client: client}
+	// ========================================
+	// 3. 实例化业务处理器 (依赖注入)
+	// ========================================
 
+	// 读者端处理器 (扫码、验证、兑奖)
+	relayH := &handlers.RelayHandler{
+		RDB:    rdb,
+		Client: client,
+	}
+
+	// 大盘市场处理器 (书籍排行榜)
+	marketH := &handlers.MarketHandler{
+		RDB: rdb,
+	}
+
+	// 工厂合约处理器 (部署新书合约)
+	factoryH := &handlers.FactoryHandler{
+		RDB:     rdb,
+		Client:  client,
+		ChainID: chainID,
+	}
+
+	// NFT 铸造处理器
+	mintH := &handlers.MintHandler{
+		RDB:    rdb,
+		Client: client,
+	}
+
+	// 身份验证处理器
+	authH := &handlers.AuthHandler{
+		RDB:    rdb,
+		Client: client,
+	}
+
+	// ========================================
+	// 4. 注册路由
+	// ========================================
 	r := mux.NewRouter()
 
 	// 全局请求日志中间件
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			fmt.Printf("🔔 [REQ] %s %s | From: %s\n", r.Method, r.URL.Path, r.RemoteAddr)
-			next.ServeHTTP(w, r)
-		})
-	})
+	r.Use(requestLoggerMiddleware)
 
-	// --- 路由挂载 ---
-	r.HandleFunc("/api/v1/precheck-code", precheckCodeHandler).Methods("GET", "OPTIONS")
-	r.HandleFunc("/api/v1/factory/verify-publisher", verifyPublisherHandler).Methods("GET", "OPTIONS")
-	r.HandleFunc("/api/v1/factory/create", createBookHandler).Methods("POST", "OPTIONS")
-	r.HandleFunc("/api/v1/tickers", marketH.GetTickers).Methods("GET", "OPTIONS")
-	r.HandleFunc("/api/v1/market/tickers", marketH.GetTickers).Methods("GET", "OPTIONS") // 添加完整路径
-	r.HandleFunc("/api/v1/factory/deploy-book", deployBookHandler).Methods("POST", "OPTIONS") // 出版社部署书籍
-	r.HandleFunc("/secret/get-binding", getBindingHandler).Methods("GET", "OPTIONS")
-	r.HandleFunc("/secret/verify", verifyHandler).Methods("GET", "OPTIONS")
-	r.HandleFunc("/relay/mint", mintHandler).Methods("POST", "OPTIONS")
+	// --- 身份验证路由 ---
+	// GET  /secret/get-binding      获取地址绑定信息
+	// GET  /secret/verify           验证激活码并分配角色
+	r.HandleFunc("/secret/get-binding", authH.GetBinding).Methods("GET", "OPTIONS")
+	r.HandleFunc("/secret/verify", authH.Verify).Methods("GET", "OPTIONS")
+
+	// --- 读者端路由 (Relay 业务) ---
+	// POST /relay/save-code         验证并暂存书码
+	// POST /relay/reward            执行 5 码兑换
+	// GET  /relay/stats             获取推荐人统计/排行榜
 	r.HandleFunc("/relay/save-code", relayH.SaveCode).Methods("POST", "OPTIONS")
 	r.HandleFunc("/relay/reward", relayH.Reward).Methods("POST", "OPTIONS")
 	r.HandleFunc("/relay/stats", relayH.GetReferrerStats).Methods("GET", "OPTIONS")
-	r.HandleFunc("/api/admin/check-access", checkAdminAccessHandler).Methods("GET", "OPTIONS")
-	r.HandleFunc("/api/v1/analytics/distribution", relayH.GetDistribution).Methods("GET", "OPTIONS")
-	
-	// 新增：NFT 统计 & 读者位置
-	r.HandleFunc("/api/v1/nft/total-minted", getTotalMintedHandler).Methods("GET", "OPTIONS")
-	r.HandleFunc("/api/v1/reader/location", getReaderLocationHandler).Methods("GET", "OPTIONS")
-	
-	// 新增：出版社余额查询
-	r.HandleFunc("/api/v1/publisher/balance", getPublisherBalanceHandler).Methods("GET", "OPTIONS")
 
-	port := "8080"
+	// --- NFT 铸造路由 ---
+	// POST /relay/mint              铸造 NFT
+	// GET  /api/v1/nft/total-minted 获取链上总铸造量
+	r.HandleFunc("/relay/mint", mintH.Mint).Methods("POST", "OPTIONS")
+	r.HandleFunc("/api/v1/nft/total-minted", mintH.GetTotalMinted).Methods("GET", "OPTIONS")
+
+	// --- 大盘市场路由 ---
+	// GET /api/v1/tickers           获取书籍销量排行榜 (兼容旧路径)
+	// GET /api/v1/market/tickers    获取书籍销量排行榜
+	r.HandleFunc("/api/v1/tickers", marketH.GetTickers).Methods("GET", "OPTIONS")
+	r.HandleFunc("/api/v1/market/tickers", marketH.GetTickers).Methods("GET", "OPTIONS")
+
+	// --- 工厂合约路由 (出版社后端代签) ---
+	// GET  /api/v1/precheck-code          预检查激活码
+	// GET  /api/v1/factory/verify-publisher 验证出版社身份
+	// POST /api/v1/factory/create         创建书籍 (旧接口)
+	// POST /api/v1/factory/deploy-book    部署书籍合约
+	// GET  /api/v1/publisher/balance      查询出版社余额
+	r.HandleFunc("/api/v1/precheck-code", factoryH.PrecheckCode).Methods("GET", "OPTIONS")
+	r.HandleFunc("/api/v1/factory/verify-publisher", factoryH.VerifyPublisher).Methods("GET", "OPTIONS")
+	r.HandleFunc("/api/v1/factory/create", factoryH.CreateBook).Methods("POST", "OPTIONS")
+	r.HandleFunc("/api/v1/factory/deploy-book", factoryH.DeployBook).Methods("POST", "OPTIONS")
+	r.HandleFunc("/api/v1/publisher/balance", factoryH.GetPublisherBalance).Methods("GET", "OPTIONS")
+
+	// --- 数据分析路由 ---
+	// GET /api/v1/analytics/distribution 获取读者地理分布热力图
+	// GET /api/v1/reader/location        获取当前读者位置
+	r.HandleFunc("/api/v1/analytics/distribution", relayH.GetDistribution).Methods("GET", "OPTIONS")
+	r.HandleFunc("/api/v1/reader/location", mintH.GetReaderLocation).Methods("GET", "OPTIONS")
+
+	// --- 管理员路由 ---
+	// GET /api/admin/check-access 检查管理员权限
+	r.HandleFunc("/api/admin/check-access", authH.CheckAdminAccess).Methods("GET", "OPTIONS")
+
+	// ========================================
+	// 5. 启动服务
+	// ========================================
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
 	fmt.Printf("🚀 Whale Vault 后端启动成功 (监听端口: %s)\n", port)
-	
+
 	srv := &http.Server{
 		Addr:    "0.0.0.0:" + port,
-		Handler: cors(r),
+		Handler: corsMiddleware(r),
 	}
 	log.Fatal(srv.ListenAndServe())
 }
 
-// --- 业务处理器实现 ---
+// ========================================
+// 中间件
+// ========================================
 
-func getBindingHandler(w http.ResponseWriter, r *http.Request) {
-	code := r.URL.Query().Get("codeHash")
-	data, err := rdb.HGetAll(ctx, "vault:bind:"+code).Result()
-	if err != nil || len(data) == 0 {
-		fmt.Printf("⚠️  Binding 未找到: %s\n", code)
-		sendJSON(w, 200, CommonResponse{Ok: false, Error: "No binding found"})
-		return
-	}
-	sendJSON(w, 200, CommonResponse{Ok: true, Address: data["address"]})
-}
-
-func verifyHandler(w http.ResponseWriter, r *http.Request) {
-	addr := strings.ToLower(r.URL.Query().Get("address"))
-	code := r.URL.Query().Get("codeHash")
-
-	if addr == "" || code == "" {
-		sendJSON(w, 400, CommonResponse{Ok: false, Error: "Missing params"})
-		return
-	}
-
-	// 1. 检查出版社激活码
-	isPubCode, _ := rdb.SIsMember(ctx, "vault:roles:publishers_codes", code).Result()
-	if isPubCode {
-		rdb.SAdd(ctx, "vault:roles:publishers", addr)
-		sendJSON(w, 200, CommonResponse{Ok: true, Role: "publisher"})
-		return
-	}
-
-	// 2. 检查作者激活码
-	isAuthorCode, _ := rdb.SIsMember(ctx, "vault:roles:authors_codes", code).Result()
-	if isAuthorCode {
-		rdb.SAdd(ctx, "vault:roles:authors", addr)
-		sendJSON(w, 200, CommonResponse{Ok: true, Role: "author"})
-		return
-	}
-
-	// 3. 检查读者激活码
-	isValid, _ := rdb.SIsMember(ctx, "vault:codes:valid", code).Result()
-	isUsed, _ := rdb.SIsMember(ctx, "vault:codes:used", code).Result()
-
-	if isValid || isUsed {
-		sendJSON(w, 200, CommonResponse{Ok: true, Role: "reader"})
-		return
-	}
-
-	sendJSON(w, 403, CommonResponse{Ok: false, Error: "Unauthorized"})
-}
-
-func mintHandler(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Dest     string `json:"dest"`
-		CodeHash string `json:"codeHash"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		sendJSON(w, 400, CommonResponse{Ok: false, Error: "Invalid JSON"})
-		return
-	}
-
-	isPubCode, _ := rdb.SIsMember(ctx, "vault:roles:publishers_codes", req.CodeHash).Result()
-	if isPubCode {
-		rdb.SAdd(ctx, "vault:roles:publishers", strings.ToLower(req.Dest))
-		sendJSON(w, 200, CommonResponse{Ok: true, Status: "PUBLISHER_AUTHORIZED", Role: "publisher"})
-		return
-	}
-
-	removed, _ := rdb.SRem(ctx, "vault:codes:valid", req.CodeHash).Result()
-	if removed == 0 {
-		alreadyUsed, _ := rdb.SIsMember(ctx, "vault:codes:used", req.CodeHash).Result()
-		if alreadyUsed {
-			sendJSON(w, 200, CommonResponse{Ok: true, Status: "ALREADY_MINTED", Role: "reader"})
-			return
-		}
-		sendJSON(w, 403, CommonResponse{Ok: false, Error: "Code invalid or used"})
-		return
-	}
-
-	// 🌟 抓取读者 IP 并存入 Redis 热力图数据
-	clientIP := getClientIP(r)
-	if clientIP != "" {
-		// 存入 IP 集合用于热力图
-		rdb.SAdd(ctx, "vault:heatmap:ips", clientIP)
-		// 记录 IP 与时间戳
-		rdb.HSet(ctx, "vault:heatmap:ip_time", clientIP, time.Now().Unix())
-		fmt.Printf("📍 读者 IP 已记录: %s\n", clientIP)
-	}
-
-	txHash, err := executeMintLegacy(req.Dest)
-	if err != nil {
-		// 失败回滚到有效池
-		rdb.SAdd(ctx, "vault:codes:valid", req.CodeHash) 
-		sendJSON(w, 500, CommonResponse{Ok: false, Error: err.Error()})
-		return
-	}
-
-	rdb.SAdd(ctx, "vault:codes:used", req.CodeHash)
-	sendJSON(w, 200, CommonResponse{Ok: true, TxHash: txHash, Role: "reader"})
-}
-
-// 获取客户端真实 IP
-func getClientIP(r *http.Request) string {
-	// 优先检查代理头
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		parts := strings.Split(xff, ",")
-		return strings.TrimSpace(parts[0])
-	}
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return xri
-	}
-	// 直连情况
-	ip := r.RemoteAddr
-	if colonIdx := strings.LastIndex(ip, ":"); colonIdx != -1 {
-		ip = ip[:colonIdx]
-	}
-	return ip
-}
-
-// 获取链上 NFT 总铸造数量
-func getTotalMintedHandler(w http.ResponseWriter, r *http.Request) {
-	contractAddr := os.Getenv("CONTRACT_ADDR")
-	if contractAddr == "" {
-		sendJSON(w, 500, map[string]interface{}{"error": "CONTRACT_ADDR not configured"})
-		return
-	}
-
-	// 调用合约的 totalSales() 方法 - 方法签名: 7912d7c5 (不带0x前缀)
-	methodID := common.FromHex("7912d7c5")
-	
-	toAddr := common.HexToAddress(contractAddr)
-	msg := ethereum.CallMsg{
-		To:   &toAddr,
-		Data: methodID,
-	}
-
-	result, err := client.CallContract(ctx, msg, nil)
-	if err != nil {
-		fmt.Printf("❌ 查询 totalSales 失败: %v\n", err)
-		sendJSON(w, 500, map[string]interface{}{"error": err.Error()})
-		return
-	}
-
-	// 解析返回的 uint256 (处理空返回)
-	var total int64 = 0
-	if len(result) > 0 {
-		total = new(big.Int).SetBytes(result).Int64()
-	}
-	sendJSON(w, 200, map[string]interface{}{"total": total})
-}
-
-// 获取读者地理位置（基于 IP）
-func getReaderLocationHandler(w http.ResponseWriter, r *http.Request) {
-	clientIP := getClientIP(r)
-	if clientIP == "" || clientIP == "127.0.0.1" || strings.HasPrefix(clientIP, "192.168.") {
-		sendJSON(w, 200, map[string]string{"city": "本地开发", "country": "CN"})
-		return
-	}
-
-	// 使用免费 IP 地理位置 API
-	resp, err := http.Get(fmt.Sprintf("http://ip-api.com/json/%s?lang=zh-CN", clientIP))
-	if err != nil {
-		sendJSON(w, 200, map[string]string{"city": "未知", "country": "未知"})
-		return
-	}
-	defer resp.Body.Close()
-
-	var geoData struct {
-		City    string `json:"city"`
-		Region  string `json:"regionName"`
-		Country string `json:"country"`
-		Lat     float64 `json:"lat"`
-		Lon     float64 `json:"lon"`
-	}
-	json.NewDecoder(resp.Body).Decode(&geoData)
-
-	// 同时存入热力图坐标数据
-	if geoData.Lat != 0 && geoData.Lon != 0 {
-		locKey := fmt.Sprintf("%s_%s", geoData.City, geoData.Country)
-		// 存储格式: "城市_国家" -> "经度,纬度,计数"
-		existingData, _ := rdb.HGet(ctx, "vault:heatmap:locations", locKey).Result()
-		count := 1
-		if existingData != "" {
-			parts := strings.Split(existingData, ",")
-			if len(parts) == 3 {
-				oldCount, _ := strconv.Atoi(parts[2])
-				count = oldCount + 1
-			}
-		}
-		rdb.HSet(ctx, "vault:heatmap:locations", locKey, fmt.Sprintf("%f,%f,%d", geoData.Lon, geoData.Lat, count))
-	}
-
-	sendJSON(w, 200, map[string]string{
-		"city":    geoData.City,
-		"region":  geoData.Region,
-		"country": geoData.Country,
+// requestLoggerMiddleware 全局请求日志
+func requestLoggerMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Printf("🔔 [REQ] %s %s | From: %s\n", r.Method, r.URL.Path, r.RemoteAddr)
+		next.ServeHTTP(w, r)
 	})
 }
 
-// --- 核心修复：调用 NFT 合约的 mint(address to) 方法 ---
-
-func executeMintLegacy(to string) (string, error) {
-	if len(relayers) == 0 {
-		return "", fmt.Errorf("no relayers available")
-	}
-
-	// 获取 NFT 合约地址（子合约）
-	contractAddr := os.Getenv("CONTRACT_ADDR")
-	if contractAddr == "" {
-		return "", fmt.Errorf("CONTRACT_ADDR not configured")
-	}
-
-	// 1. 选择 Relayer
-	idx := atomic.AddUint64(&relayerCounter, 1) % uint64(len(relayers))
-	rel := relayers[idx]
-	
-	rel.mu.Lock()
-	defer rel.mu.Unlock()
-
-	// 2. 实时获取链上 Pending Nonce
-	nonce, err := client.PendingNonceAt(ctx, rel.Address)
-	if err != nil {
-		return "", fmt.Errorf("failed to fetch nonce: %v", err)
-	}
-
-	// 3. 获取实时建议 Gas 价格
-	gasPrice, err := client.SuggestGasPrice(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to suggest gas price: %v", err)
-	}
-
-	// 4. 构建合约调用 Data: mint(address to) -> 方法签名 0x6a627842
-	// mint(address) 的函数选择器是 keccak256("mint(address)")[:4] = 0x6a627842
-	methodID := common.FromHex("0x6a627842")
-	// 将目标地址填充为 32 字节
-	paddedAddress := common.LeftPadBytes(common.HexToAddress(to).Bytes(), 32)
-	// 拼接 calldata: 方法选择器 + 参数
-	data := append(methodID, paddedAddress...)
-
-	// 5. 构建交易 - 调用合约而非普通转账
-	gasLimit := uint64(200000) // Mint 操作需要更多 Gas
-	tx := types.NewTransaction(
-		nonce,
-		common.HexToAddress(contractAddr), // 目标是 NFT 合约地址
-		big.NewInt(0),                      // 不发送 CFX
-		gasLimit,
-		gasPrice,
-		data, // 合约调用数据
-	)
-	
-	// 6. 签名
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), rel.PrivateKey)
-	if err != nil {
-		return "", fmt.Errorf("failed to sign tx: %v", err)
-	}
-
-	// 7. 发送交易
-	err = client.SendTransaction(ctx, signedTx)
-	if err != nil {
-		fmt.Printf("❌ Relayer %s Mint失败: %v\n", rel.Address.Hex(), err)
-		return "", err
-	}
-
-	fmt.Printf("🚀 Mint成功 | 合约: %s | 接收者: %s | TX: %s | Nonce: %d\n", 
-		contractAddr, to, signedTx.Hash().Hex(), nonce)
-	return signedTx.Hash().Hex(), nil
-}
-
-func loadRelayers() {
-	countStr := os.Getenv("RELAYER_COUNT")
-	count, _ := strconv.Atoi(countStr)
-	for i := 0; i < count; i++ {
-		key := os.Getenv(fmt.Sprintf("PRIVATE_KEY_%d", i))
-		if key == "" { continue }
-		priv, err := crypto.HexToECDSA(strings.TrimPrefix(key, "0x"))
-		if err != nil {
-			log.Printf("加载密钥 PRIVATE_KEY_%d 失败: %v", i, err)
-			continue
-		}
-		relayers = append(relayers, &Relayer{
-			PrivateKey: priv,
-			Address:    crypto.PubkeyToAddress(priv.PublicKey),
-		})
-	}
-	fmt.Printf("✅ 已加载 %d 个中继器钱包\n", len(relayers))
-}
-
-func sendJSON(w http.ResponseWriter, code int, p interface{}) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(p)
-}
-
-func cors(h http.Handler) http.Handler {
+// corsMiddleware 跨域处理
+func corsMiddleware(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
@@ -437,306 +196,31 @@ func cors(h http.Handler) http.Handler {
 	})
 }
 
-// 空实现保持编译通过
-func precheckCodeHandler(w http.ResponseWriter, r *http.Request) { sendJSON(w, 200, CommonResponse{Ok: true}) }
-func verifyPublisherHandler(w http.ResponseWriter, r *http.Request) { sendJSON(w, 200, CommonResponse{Ok: true}) }
-func createBookHandler(w http.ResponseWriter, r *http.Request) { sendJSON(w, 200, CommonResponse{Ok: true}) }
-func checkAdminAccessHandler(w http.ResponseWriter, r *http.Request) { sendJSON(w, 200, CommonResponse{Ok: true}) }
+// ========================================
+// 工具函数 (供其他包使用)
+// ========================================
 
-// 出版社部署书籍合约
-func deployBookHandler(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		CodeHash   string `json:"codeHash"`   // 出版社的激活码哈希
-		BookName   string `json:"bookName"`   // 书籍名称
-		AuthorName string `json:"authorName"` // 作者名称
-		Symbol     string `json:"symbol"`     // 书籍代码
+// GetClientIP 获取客户端真实 IP
+func GetClientIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		parts := strings.Split(xff, ",")
+		return strings.TrimSpace(parts[0])
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		sendJSON(w, 400, map[string]interface{}{"ok": false, "error": "参数格式错误"})
-		return
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return xri
 	}
-
-	// 1. 验证出版社身份
-	isPubCode, _ := rdb.SIsMember(ctx, "vault:roles:publishers_codes", req.CodeHash).Result()
-	if !isPubCode {
-		sendJSON(w, 403, map[string]interface{}{"ok": false, "error": "非出版社身份，无权部署"})
-		return
+	ip := r.RemoteAddr
+	if colonIdx := strings.LastIndex(ip, ":"); colonIdx != -1 {
+		ip = ip[:colonIdx]
 	}
+	return ip
+}
 
-	// 2. 从 Redis 获取出版社私钥（金库协议统一存储格式）
-	// 格式: vault:bind:{codeHash} -> {"address": "0x...", "private_key": "xxx", "role": "publisher"}
-	pubData, err := rdb.HGetAll(ctx, "vault:bind:"+req.CodeHash).Result()
-	if err != nil || len(pubData) == 0 {
-		sendJSON(w, 500, map[string]interface{}{"ok": false, "error": "无法获取出版社密钥信息"})
-		return
-	}
-
-	privateKeyHex := pubData["private_key"]
-	publisherAddress := pubData["address"]
-
-	if privateKeyHex == "" || publisherAddress == "" {
-		sendJSON(w, 500, map[string]interface{}{"ok": false, "error": "出版社密钥配置不完整"})
-		return
-	}
-
-	// 3. 解析私钥
+// DeriveAddressFromPrivateKey 从私钥推导地址
+func DeriveAddressFromPrivateKey(privateKeyHex string) string {
 	privateKey, err := crypto.HexToECDSA(strings.TrimPrefix(privateKeyHex, "0x"))
 	if err != nil {
-		sendJSON(w, 500, map[string]interface{}{"ok": false, "error": "私钥格式无效"})
-		return
+		return ""
 	}
-
-	// 4. 检查余额是否足够（需要 1 CFX 部署费 + Gas）
-	pubAddr := common.HexToAddress(publisherAddress)
-	balance, err := client.BalanceAt(ctx, pubAddr, nil)
-	if err != nil {
-		sendJSON(w, 500, map[string]interface{}{"ok": false, "error": "无法查询余额: " + err.Error()})
-		return
-	}
-
-	// 需要至少 1.5 CFX (1 CFX 部署费 + 0.5 CFX Gas 预留)
-	minRequired := new(big.Int).Mul(big.NewInt(15), big.NewInt(1e17)) // 1.5 * 10^18
-	if balance.Cmp(minRequired) < 0 {
-		actualBalance := new(big.Float).Quo(new(big.Float).SetInt(balance), big.NewFloat(1e18))
-		sendJSON(w, 400, map[string]interface{}{
-			"ok":      false,
-			"error":   fmt.Sprintf("余额不足 (当前: %.4f CFX)，部署书籍合约需至少 1.5 CFX", actualBalance),
-			"balance": fmt.Sprintf("%.4f", actualBalance),
-		})
-		return
-	}
-
-	// 5. 构建调用工厂合约的交易
-	factoryAddr := os.Getenv("FACTORY_ADDR")
-	if factoryAddr == "" {
-		factoryAddr = "0x4c9c8Ac267eb816B21ea81330962ecD73E80E68f" // 默认工厂合约地址
-	}
-
-	// 使用零地址作为 Relayer（避免合约授权错误）
-	zeroAddr := common.Address{} // 0x0000000000000000000000000000000000000000
-
-	// 手动编码参数
-	callData := encodeDeployBookCall(req.BookName, req.Symbol, req.AuthorName, "https://arweave.net/metadata", zeroAddr)
-	if callData == nil {
-		sendJSON(w, 500, map[string]interface{}{"ok": false, "error": "编码交易数据失败"})
-		return
-	}
-
-	// 🔍 调试：打印完整 calldata，可用于对比 cast 输出
-	fmt.Printf("🔧 [DEBUG] 完整 calldata (hex): 0x%x\n", callData)
-	fmt.Printf("🔧 [DEBUG] 参数: bookName=%s, symbol=%s, author=%s\n", req.BookName, req.Symbol, req.AuthorName)
-
-	// 6. 获取 Nonce 和 Gas Price
-	nonce, err := client.PendingNonceAt(ctx, pubAddr)
-	if err != nil {
-		sendJSON(w, 500, map[string]interface{}{"ok": false, "error": "获取 Nonce 失败"})
-		return
-	}
-
-	gasPrice, err := client.SuggestGasPrice(ctx)
-	if err != nil {
-		sendJSON(w, 500, map[string]interface{}{"ok": false, "error": "获取 Gas 价格失败"})
-		return
-	}
-
-	// 7. 创建交易（发送 1 CFX 作为部署费）
-	deployFee := new(big.Int).Mul(big.NewInt(1), big.NewInt(1e18)) // 1 CFX
-	tx := types.NewTransaction(
-		nonce,
-		common.HexToAddress(factoryAddr),
-		deployFee,
-		uint64(3000000), // Gas Limit (部署合约需要更多)
-		gasPrice,
-		callData,
-	)
-
-	// 8. 签名交易
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), privateKey)
-	if err != nil {
-		sendJSON(w, 500, map[string]interface{}{"ok": false, "error": "签名交易失败: " + err.Error()})
-		return
-	}
-
-	// 9. 发送交易
-	err = client.SendTransaction(ctx, signedTx)
-	if err != nil {
-		sendJSON(w, 500, map[string]interface{}{"ok": false, "error": "发送交易失败: " + err.Error()})
-		return
-	}
-
-	txHash := signedTx.Hash().Hex()
-	fmt.Printf("📚 书籍合约部署中 | 出版社: %s | 书名: %s | TX: %s\n", publisherAddress, req.BookName, txHash)
-
-	// 10. 记录到 Redis 大盘（初始销量为 0）
-	bookKey := fmt.Sprintf("%s:%s:%s", req.Symbol, req.BookName, req.AuthorName)
-	rdb.HSet(ctx, "vault:books:pending", txHash, bookKey)
-
-	sendJSON(w, 200, map[string]interface{}{
-		"ok":        true,
-		"txHash":    txHash,
-		"status":    "PENDING",
-		"message":   "书籍合约部署交易已提交，请等待链上确认",
-		"bookName":  req.BookName,
-		"symbol":    req.Symbol,
-		"author":    req.AuthorName,
-		"publisher": publisherAddress,
-	})
-}
-
-// encodeDeployBookCall 编码 deployBook 函数调用
-// 使用 go-ethereum 的 ABI 编码替代手工编码
-func encodeDeployBookCall(bookName, symbol, authorName, baseURI string, relayer common.Address) []byte {
-	// 函数选择器: deployBook(string,string,string,string,address)
-	// cast sig "deployBook(string,string,string,string,address)" = 0x7d9f6db5
-	methodID := common.FromHex("7d9f6db5")
-
-	// 使用 go-ethereum/accounts/abi 进行正确编码
-	// 手动构建正确的 ABI 编码:
-	// - 动态类型(string)的头部存储的是相对于参数区域开始的偏移量
-	// - 静态类型(address)直接存储值
-
-	// 参数区域布局 (相对偏移量，从参数区域开始计算):
-	// slot 0: offset to string1 (bookName)
-	// slot 1: offset to string2 (symbol)  
-	// slot 2: offset to string3 (authorName)
-	// slot 3: offset to string4 (baseURI)
-	// slot 4: address (直接存值，32字节)
-	// slot 5+: 动态数据
-
-	encodeString := func(s string) []byte {
-		strBytes := []byte(s)
-		// 长度 (32 bytes, big-endian)
-		length := make([]byte, 32)
-		big.NewInt(int64(len(strBytes))).FillBytes(length)
-		// 数据 (填充到32字节的倍数)
-		paddedLen := ((len(strBytes) + 31) / 32) * 32
-		data := make([]byte, paddedLen)
-		copy(data, strBytes)
-		return append(length, data...)
-	}
-
-	// 编码各字符串的数据部分
-	str1Data := encodeString(bookName)
-	str2Data := encodeString(symbol)
-	str3Data := encodeString(authorName)
-	str4Data := encodeString(baseURI)
-
-	// 头部固定区域大小: 5 * 32 = 160 字节
-	headSize := 5 * 32
-
-	// 计算每个字符串的偏移量 (相对于参数区域开始位置)
-	offset1 := headSize                               // 第一个string的数据从160字节开始
-	offset2 := offset1 + len(str1Data)
-	offset3 := offset2 + len(str2Data)
-	offset4 := offset3 + len(str3Data)
-
-	// 构建完整的 calldata
-	result := make([]byte, 0, 4+headSize+len(str1Data)+len(str2Data)+len(str3Data)+len(str4Data))
-	result = append(result, methodID...)
-
-	// 编码 32 字节整数的辅助函数
-	encodeUint256 := func(n int) []byte {
-		b := make([]byte, 32)
-		big.NewInt(int64(n)).FillBytes(b)
-		return b
-	}
-
-	// 头部: 4个偏移量 + 1个地址
-	result = append(result, encodeUint256(offset1)...)
-	result = append(result, encodeUint256(offset2)...)
-	result = append(result, encodeUint256(offset3)...)
-	result = append(result, encodeUint256(offset4)...)
-	
-	// address 参数 (左填充到32字节)
-	addrPadded := make([]byte, 32)
-	copy(addrPadded[12:], relayer.Bytes())
-	result = append(result, addrPadded...)
-
-	// 数据区: 按顺序追加字符串数据
-	result = append(result, str1Data...)
-	result = append(result, str2Data...)
-	result = append(result, str3Data...)
-	result = append(result, str4Data...)
-
-	fmt.Printf("🔧 [ABI] 编码完成 | 总长度: %d | 方法ID: 0x%x\n", len(result), methodID)
-	fmt.Printf("🔧 [ABI] 偏移量: [%d, %d, %d, %d]\n", offset1, offset2, offset3, offset4)
-
-	return result
-}
-
-// getPublisherBalanceHandler 查询出版社钱包余额
-func getPublisherBalanceHandler(w http.ResponseWriter, r *http.Request) {
-	codeHash := r.URL.Query().Get("codeHash")
-	fmt.Printf("📊 [Balance] 收到余额查询请求, codeHash: %s\n", codeHash)
-	
-	if codeHash == "" {
-		sendJSON(w, 400, map[string]interface{}{"ok": false, "error": "缺少 codeHash 参数"})
-		return
-	}
-
-	// 从 Redis 获取出版社信息
-	redisKey := "vault:bind:" + codeHash
-	fmt.Printf("📊 [Balance] 查询 Redis key: %s\n", redisKey)
-	
-	pubData, err := rdb.HGetAll(ctx, redisKey).Result()
-	if err != nil {
-		fmt.Printf("❌ [Balance] Redis 错误: %v\n", err)
-		sendJSON(w, 500, map[string]interface{}{"ok": false, "error": "Redis 查询失败: " + err.Error()})
-		return
-	}
-	
-	if len(pubData) == 0 {
-		fmt.Printf("❌ [Balance] Redis 未找到数据, key: %s\n", redisKey)
-		sendJSON(w, 404, map[string]interface{}{"ok": false, "error": "未找到出版社信息"})
-		return
-	}
-	
-	fmt.Printf("📊 [Balance] Redis 数据: %+v\n", pubData)
-
-	// 验证角色
-	role := pubData["role"]
-	if role != "publisher" {
-		fmt.Printf("❌ [Balance] 角色不匹配: %s (期望 publisher)\n", role)
-		sendJSON(w, 403, map[string]interface{}{"ok": false, "error": "非出版社账户，当前角色: " + role})
-		return
-	}
-
-	publisherAddress := pubData["address"]
-	if publisherAddress == "" {
-		fmt.Printf("❌ [Balance] 地址为空\n")
-		sendJSON(w, 500, map[string]interface{}{"ok": false, "error": "出版社地址无效"})
-		return
-	}
-
-	fmt.Printf("📊 [Balance] 查询地址: %s\n", publisherAddress)
-
-	// 查询链上余额
-	address := common.HexToAddress(publisherAddress)
-	balance, err := client.BalanceAt(ctx, address, nil)
-	if err != nil {
-		fmt.Printf("❌ [Balance] 链上查询失败: %v\n", err)
-		sendJSON(w, 500, map[string]interface{}{"ok": false, "error": "无法查询链上余额: " + err.Error()})
-		return
-	}
-
-	fmt.Printf("📊 [Balance] 原始余额(Wei): %s\n", balance.String())
-
-	// 转换为 CFX (1 CFX = 10^18 Wei)
-	balanceFloat := new(big.Float).Quo(new(big.Float).SetInt(balance), big.NewFloat(1e18))
-	balanceCFX, _ := balanceFloat.Float64()
-
-	// 部署费用：1 CFX + 预估 Gas 费 ~0.5 CFX = 1.5 CFX
-	deployFee := 1.5
-	maxDeploys := int(balanceCFX / deployFee)
-
-	fmt.Printf("✅ [Balance] 查询成功: %.4f CFX, 可部署 %d 次\n", balanceCFX, maxDeploys)
-
-	sendJSON(w, 200, map[string]interface{}{
-		"ok":          true,
-		"address":     publisherAddress,
-		"balance":     balanceCFX,
-		"balanceWei":  balance.String(),
-		"deployFee":   deployFee,
-		"maxDeploys":  maxDeploys,
-	})
+	return crypto.PubkeyToAddress(privateKey.PublicKey).Hex()
 }
