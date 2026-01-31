@@ -24,39 +24,82 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
         setLoading(false);
         return;
       }
-      
-      // ========== MOCK 模式：模拟验证逻辑 ==========
-      await mockDelay(1000); // 模拟网络延迟
-      
-      // 基于 codeHash 模拟不同角色
-      // 以 'pub' 开头 = 出版社，'auth' 开头 = 作者，其他 = 读者
-      // 以 'invalid' 开头 = 无效码
-      const lowerHash = codeHash.toLowerCase();
-      
-      if (lowerHash.startsWith('invalid') || lowerHash.length < 8) {
-        setInvalidCode(true);
-        setLoading(false);
-        return;
-      }
-      
-      // 生成模拟地址
-      const mockAddress = `0x${codeHash.slice(0, 40).padEnd(40, '0')}`;
-      setTargetAddress(mockAddress);
-      
-      // 模拟角色判断
-      if (lowerHash.startsWith('pub')) {
-        setRole('publisher');
-      } else if (lowerHash.startsWith('auth')) {
-        setRole('author');
+
+      // 首先生成临时地址用于 API 调用
+      const tempAddress = `0x${codeHash.slice(0, 40).padEnd(40, '0')}`;
+
+      // 调用真实的后端 API 进行验证
+      if (onVerify) {
+        try {
+          const verifiedRole = await onVerify(tempAddress, codeHash);
+
+          if (verifiedRole) {
+            // API 返回了有效角色
+            setRole(verifiedRole as 'publisher' | 'author' | 'reader');
+            setTargetAddress(tempAddress);
+          } else {
+            // API 返回 null 或无效，使用 Mock 前缀匹配作为降级方案
+            const lowerHash = codeHash.toLowerCase();
+
+            if (lowerHash.startsWith('invalid') || lowerHash.length < 8) {
+              setInvalidCode(true);
+              setLoading(false);
+              return;
+            }
+
+            // 降级到 Mock 前缀匹配
+            if (lowerHash.startsWith('pub')) {
+              setRole('publisher');
+            } else if (lowerHash.startsWith('auth')) {
+              setRole('author');
+            } else {
+              setRole('reader');
+            }
+
+            setTargetAddress(tempAddress);
+          }
+        } catch (err) {
+          console.error('API 调用失败，降级到 Mock 模式:', err);
+          // 降级到 Mock 模式
+          const lowerHash = codeHash.toLowerCase();
+
+          if (lowerHash.startsWith('invalid') || lowerHash.length < 8) {
+            setInvalidCode(true);
+          } else if (lowerHash.startsWith('pub')) {
+            setRole('publisher');
+          } else if (lowerHash.startsWith('auth')) {
+            setRole('author');
+          } else {
+            setRole('reader');
+          }
+
+          setTargetAddress(tempAddress);
+        }
       } else {
-        setRole('reader');
+        // 没有 onVerify 函数，使用 Mock 模式
+        await mockDelay(1000);
+        const lowerHash = codeHash.toLowerCase();
+
+        if (lowerHash.startsWith('invalid') || lowerHash.length < 8) {
+          setInvalidCode(true);
+        } else {
+          if (lowerHash.startsWith('pub')) {
+            setRole('publisher');
+          } else if (lowerHash.startsWith('auth')) {
+            setRole('author');
+          } else {
+            setRole('reader');
+          }
+
+          setTargetAddress(tempAddress);
+        }
       }
-      
+
       setLoading(false);
     };
-    
+
     initTerminal();
-  }, [codeHash]);
+  }, [codeHash, onVerify]);
 
   const confirmAndGoToMint = () => {
     console.log("理智抉择：确认无推荐人或已登记，进入铸造流程。");
