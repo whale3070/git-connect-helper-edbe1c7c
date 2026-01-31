@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MOCK_BOOKS, MOCK_REGIONS, mockDelay, generateFakeTxHash, getTotalSales } from '../data/mockData';
 import { showToast, ToastContainer } from '../components/ui/CyberpunkToast';
+import { useBookFactory } from '../hooks/useBookFactory';
 
 // Mock 书籍销量数据结构
 interface BookSales {
@@ -45,6 +46,14 @@ const Publisher: React.FC = () => {
   const [bookSales, setBookSales] = useState<BookSales[]>([]);
   const [regionRanks, setRegionRanks] = useState<RegionRank[]>([]);
   const [totalSales, setTotalSales] = useState<number>(0);
+
+  // 智能合约交互 hook (真实合约调用)
+  const {
+    isLoading: contractLoading,
+    error: contractError,
+    deployBook,
+    getExplorerLink
+  } = useBookFactory();
 
   useEffect(() => {
     const initPublisher = async () => {
@@ -102,7 +111,7 @@ const Publisher: React.FC = () => {
     showToast('余额已刷新 (Mock)', 'success');
   };
 
-  // Mock: 部署合约
+  // 部署合约 - 调用真实智能合约
   const handleDeployContract = async () => {
     if (!bookName || !symbol) {
       setError("请完整填写书籍名称和代码");
@@ -112,24 +121,38 @@ const Publisher: React.FC = () => {
     setOpLoading(true);
     setError(null);
 
-    await mockDelay(2000);
-    
-    const txHash = generateFakeTxHash();
-    setContractAddr(txHash);
-    
-    // 添加到列表
-    const newBook: BookSales = {
-      address: txHash,
-      symbol: symbol.toUpperCase(),
-      name: bookName,
-      author: author || '未知作者',
-      sales: 0,
-      explorerUrl: '#'
-    };
-    setBookSales(prev => [newBook, ...prev]);
-    
-    showToast(`合约部署成功！${symbol.toUpperCase()}`, 'success', txHash);
-    setOpLoading(false);
+    try {
+      // 调用真实的智能合约部署函数
+      const result = await deployBook({
+        bookName,
+        symbol: symbol.toUpperCase(),
+        authorName: author || '未知作者',
+        baseURI: `ipfs://${symbol.toLowerCase()}/`, // 简化版 baseURI，实际应从表单获取
+        relayer: undefined // 使用默认零地址
+      });
+
+      // 保存返回的合约地址
+      setContractAddr(result.bookAddress);
+
+      // 添加到本地列表
+      const newBook: BookSales = {
+        address: result.bookAddress,
+        symbol: symbol.toUpperCase(),
+        name: bookName,
+        author: author || '未知作者',
+        sales: 0,
+        explorerUrl: getExplorerLink(result.bookAddress, 'address')
+      };
+      setBookSales(prev => [newBook, ...prev]);
+
+      showToast(`合约部署成功！${symbol.toUpperCase()}`, 'success', result.txHash);
+    } catch (err: any) {
+      const errorMsg = err.message || '部署失败，请重试';
+      setError(errorMsg);
+      showToast(`部署失败: ${errorMsg}`, 'error');
+    } finally {
+      setOpLoading(false);
+    }
   };
 
   // Mock: 批量生成码
@@ -339,15 +362,15 @@ const Publisher: React.FC = () => {
                 
                 <button
                   onClick={handleDeployContract}
-                  disabled={opLoading}
+                  disabled={opLoading || contractLoading}
                   className="w-full mt-4 py-4 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl font-bold text-sm uppercase tracking-widest hover:from-purple-500 hover:to-pink-500 disabled:opacity-50 transition-all"
                 >
-                  {opLoading ? '模拟部署中...' : '部署合约 (Mock)'}
+                  {opLoading || contractLoading ? '正在部署合约...' : '部署合约'}
                 </button>
-                
+
                 {contractAddr && (
                   <div className="mt-4 p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
-                    <p className="text-green-400 text-xs mb-2">✓ 合约部署成功 (Mock)</p>
+                    <p className="text-green-400 text-xs mb-2">✓ 合约部署成功</p>
                     <p className="text-[10px] font-mono text-gray-400 break-all">{contractAddr}</p>
                   </div>
                 )}
