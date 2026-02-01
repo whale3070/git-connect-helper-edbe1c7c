@@ -5,88 +5,135 @@ import (
 	"fmt"
 	"math/big"
 	"sort"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/redis/go-redis/v9"
 )
 
-// DispenseReward 确保将奖励精确发送给 recipientAddr
-func DispenseReward(client *ethclient.Client, recipientAddr string, privateKeyHex string, contractAddrHex string, bookCodes []string) (string, string, error) {
-	// 1. 解析私钥并获取后端发送者地址
-	privateKey, err := crypto.HexToECDSA(privateKeyHex)
-	if err != nil {
-		return "", "", fmt.Errorf("私钥无效: %v", err)
-	}
-	fromAddr := crypto.PubkeyToAddress(privateKey.PublicKey)
+// RewardService 封装区块链客户端、Redis以及后台私钥
+type RewardService struct {
+	Client      *ethclient.Client
+	Redis       *redis.Client
+	BackendKey  string
+	ContractHex string
+}
 
-	// 2. 准备合约与接收者地址
-	contractAddr := common.HexToAddress(contractAddrHex)
+// dispense 发放奖励
+func (s *RewardService) DispenseReward(
+	ctx context.Context,
+	referrerAddr string,
+	recipientAddr string,
+	codes []string,
+) (string, string, error) {
+
+	// ---------- 1. 基础校验 ----------
+	if len(codes) != 5 {
+		return "", "", fmt.Errorf("必须提供 5 个 hashcode")
+	}
+
+	referrer := common.HexToAddress(referrerAddr)
 	recipient := common.HexToAddress(recipientAddr)
 
-	// 3. 构造函数签名: dispenseTokens(address,bytes32)
-	// 确保合约中此函数有 'onlyBackend' 或类似的修饰器，校验的是 msg.sender
+	// recipient 防二刷
+	if s.Redis.Exists(ctx, "reward:recipient:"+recipient.Hex()).Val() == 1 {
+		return "", "", fmt.Errorf("该地址已领取过奖励")
+	}
+
+	// ---------- 2. 生成 businessHash ----------
+	businessHash := generateBusinessHashCode(codes)
+	businessHex := businessHash.Hex()
+
+	// businessHash 防重放
+	if s.Redis.Exists(ctx, "reward:business:"+businessHex).Val() == 1 {
+		return "", "", fmt.Errorf("该组 hashcode 已被使用")
+	}
+
+	// ---------- 3. 构造交易 ----------
+	privateKeyECDSA, err := crypto.HexToECDSA(s.BackendKey)
+	if err != nil {
+		return "", "", err
+	}
+
+	fromAddr := crypto.PubkeyToAddress(privateKeyECDSA.PublicKey)
+	contractAddr := common.HexToAddress(s.ContractHex)
+
+	// 构造调用 dispenseTokens(address,bytes32) 的 data
 	methodID := crypto.Keccak256([]byte("dispenseTokens(address,bytes32)"))[:4]
+	data := append(methodID, common.LeftPadBytes(recipient.Bytes(), 32)...)
+	data = append(data, businessHash.Bytes()...)
 
-	// 参数编码：必须严格按照 ABI 规范
-	paddedAddr := common.LeftPadBytes(recipient.Bytes(), 32)
-	hashCode := generateBusinessHashCode(bookCodes) // 内部排序确保唯一性
-
-	var data []byte
-	data = append(data, methodID...)
-	data = append(data, paddedAddr...)
-	data = append(data, hashCode[:]...)
-
-	// 4. 获取链上实时参数
-	nonce, err := client.PendingNonceAt(context.Background(), fromAddr)
+	nonce, err := s.Client.PendingNonceAt(ctx, fromAddr)
 	if err != nil {
-		return "", "", fmt.Errorf("获取 nonce 失败: %v", err)
+		return "", "", err
 	}
 
-	gasPrice, err := client.SuggestGasPrice(context.Background())
+	gasPrice, err := s.Client.SuggestGasPrice(ctx)
 	if err != nil {
-		return "", "", fmt.Errorf("获取 gasPrice 失败: %v", err)
+		return "", "", err
 	}
 
-	chainID, err := client.ChainID(context.Background())
+	chainID, err := s.Client.ChainID(ctx)
 	if err != nil {
-		return "", "", fmt.Errorf("获取 chainID 失败: %v", err)
+		return "", "", err
 	}
 
-	// 5. 构造交易：注意 GasLimit
-	// 如果合约内逻辑复杂（涉及白名单查询和转账），建议给 150,000 以上
 	tx := types.NewTx(&types.LegacyTx{
 		Nonce:    nonce,
 		To:       &contractAddr,
-		Value:    big.NewInt(0), 
-		Gas:      150000, 
+		Value:    big.NewInt(0),
+		Gas:      150000,
 		GasPrice: gasPrice,
 		Data:     data,
 	})
 
-	// 6. 签名并发送
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), privateKey)
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainID), privateKeyECDSA)
 	if err != nil {
-		return "", "", fmt.Errorf("签名失败: %v", err)
+		return "", "", err
 	}
 
-	err = client.SendTransaction(context.Background(), signedTx)
-	if err != nil {
-		return "", "", fmt.Errorf("发送失败: %v", err)
+	if err := s.Client.SendTransaction(ctx, signedTx); err != nil {
+		return "", "", err
 	}
 
-	return signedTx.Hash().Hex(), fmt.Sprintf("0x%x", hashCode), nil
+	// ---------- 4. Redis 记账（事务） ----------
+	pipe := s.Redis.TxPipeline()
+
+	pipe.HSet(ctx, "reward:business:"+businessHex, map[string]interface{}{
+		"referrer":  referrer.Hex(),
+		"recipient": recipient.Hex(),
+		"timestamp": time.Now().Unix(),
+	})
+
+	pipe.SAdd(ctx, "reward:referrer:"+referrer.Hex()+":hashes", businessHex)
+	pipe.Incr(ctx, "reward:referrer:"+referrer.Hex()+":count")
+	pipe.Set(ctx, "reward:recipient:"+recipient.Hex(), 1, 0)
+
+	if _, err := pipe.Exec(ctx); err != nil {
+		return "", "", err
+	}
+
+	return signedTx.Hash().Hex(), businessHex, nil
 }
 
-// 内部逻辑：确保 5 个码顺序无关
-func generateBusinessHashCode(codes []string) [32]byte {
-	sorted := make([]string, len(codes))
-	copy(sorted, codes)
-	sort.Strings(sorted)
-	var combined []byte
-	for _, c := range sorted {
-		combined = append(combined, []byte(c)...)
+// ---------- hash 逻辑 ----------
+func generateBusinessHashCode(codes []string) common.Hash {
+	var hashes []common.Hash
+	for _, c := range codes {
+		hashes = append(hashes, common.HexToHash(c))
 	}
+
+	sort.Slice(hashes, func(i, j int) bool {
+		return hashes[i].Hex() < hashes[j].Hex()
+	})
+
+	var combined []byte
+	for _, h := range hashes {
+		combined = append(combined, h.Bytes()...)
+	}
+
 	return crypto.Keccak256Hash(combined)
 }

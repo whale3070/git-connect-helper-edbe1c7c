@@ -1,31 +1,38 @@
 import redis
 import random
 
-def generate_random_ip():
-    """生成随机的公网 IP 格式"""
-    # 避开保留地址段，随机生成一些看起来像真实用户的 IP
-    return ".".join(map(str, (random.randint(1, 254) for _ in range(4))))
+# 模拟一些城市及经纬度数据
+CITIES = [
+    ("New York", "USA", 40.7128, -74.0060),
+    ("Los Angeles", "USA", 34.0522, -118.2437),
+    ("London", "UK", 51.5074, -0.1278),
+    ("Paris", "FR", 48.8566, 2.3522),
+    ("Berlin", "DE", 52.5200, 13.4050),
+    ("Tokyo", "JP", 35.6895, 139.6917),
+    ("Beijing", "CN", 39.9042, 116.4074),
+    ("Sydney", "AU", -33.8688, 151.2093),
+    ("Moscow", "RU", 55.7558, 37.6173),
+    ("Toronto", "CA", 43.6511, -79.3831),
+    ("Singapore", "SG", 1.3521, 103.8198),
+]
 
 def main():
-    # 连接到本地 Redis
     try:
         r = redis.Redis(host='127.0.0.1', port=6379, decode_responses=True)
-        
-        # 你的 key 名称
-        key_name = "vault:reader_ips"
-        
-        print(f"正在向 {key_name} 写入测试数据...")
-        
-        # 准备 100 条 IP 数据
-        test_ips = [generate_random_ip() for _ in range(100)]
-        
-        # 使用 SADD 写入集合
-        # 因为是集合 (Set)，重复的 IP 会被自动过滤
-        added_count = r.sadd(key_name, *test_ips)
-        
-        print(f"成功写入 {added_count} 条新 IP。")
-        print(f"当前集合内 IP 总数: {r.scard(key_name)}")
-        
+
+        key_name = "vault:heatmap:locations"
+        print(f"正在向 {key_name} 写入模拟扫码数据...")
+
+        # 模拟每个城市 1~50 次扫码
+        for city, country, lat, lon in CITIES:
+            count = random.randint(1, 50)
+            field = f"{city}_{country}"
+            value = f"{lon},{lat},{count}"  # Golang 期望 "经度,纬度,计数"
+            r.hset(key_name, field, value)
+
+        total_cities = r.hlen(key_name)
+        print(f"✅ 模拟扫码数据写入完成，Hash 中共有 {total_cities} 个城市记录。")
+
     except Exception as e:
         print(f"连接 Redis 失败: {e}")
 

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"math/big"
@@ -22,7 +21,7 @@ import (
 )
 
 // ========================================
-// 全局变量
+// 
 // ========================================
 var (
 	ctx     = context.Background()
@@ -33,11 +32,11 @@ var (
 
 func main() {
 	// ========================================
-	// 1. 初始化基础环境
+	// 1. 
 	// ========================================
 	godotenv.Load()
 
-	// 初始化 Redis
+	// ?Redis
 	redisAddr := os.Getenv("REDIS_ADDR")
 	if redisAddr == "" {
 		redisAddr = "localhost:6379"
@@ -45,43 +44,40 @@ func main() {
 	rdb = redis.NewClient(&redis.Options{
 		Addr: redisAddr,
 	})
-	log.Println("✅ Redis 连接成功")
+	log.Println("?Redis ")
 
-	// 初始化以太坊客户端
-	var err error
+	// ?	var err error
 	client, err = ethclient.Dial(os.Getenv("RPC_URL"))
 	if err != nil {
-		log.Fatalf("❌ RPC 连接失败: %v", err)
+		log.Fatalf("?RPC : %v", err)
 	}
-	log.Println("✅ 以太坊客户端连接成功")
+	log.Println("?")
 
-	// 解析 Chain ID
+	//  Chain ID
 	cidStr := os.Getenv("CHAIN_ID")
 	cInt, _ := strconv.ParseInt(cidStr, 10, 64)
 	chainID = big.NewInt(cInt)
 
 	// ========================================
-	// 2. 加载中继器钱包
-	// ========================================
+	// 2. ?	// ========================================
 	handlers.LoadRelayers(client, chainID)
 
 	// ========================================
-	// 3. 初始化 RewardService
+	// 3. ?RewardService
 	// ========================================
 	rewardSvc := &blockchain.RewardService{
 		Client:      client,
 		Redis:       rdb,
-		BackendKey:  os.Getenv("BACKEND_PRIVATE_KEY"),
-		ContractHex: os.Getenv("CONTRACT_ADDRESS"),
+		BackendKey:  os.Getenv("BACKEND_PRIVATE_KEY"), // ?		ContractHex: os.Getenv("CONTRACT_ADDRESS"),    // 
 	}
 
 	// ========================================
-	// 4. 实例化业务处理器 (依赖注入)
+	// 4.  ()
 	// ========================================
 	relayH := &handlers.RelayHandler{
 		RDB:       rdb,
 		Client:    client,
-		RewardSvc: rewardSvc,
+		RewardSvc: rewardSvc, // ? RewardService
 	}
 
 	marketH := &handlers.MarketHandler{
@@ -103,65 +99,56 @@ func main() {
 		RDB:    rdb,
 		Client: client,
 	}
-
-	// 新增 EndGameHandler
-	endGameH := &handlers.EndGameHandler{
-	    RDB:          rdb,
-	    ContractAddr: "0x9D014a4401E81aa0e9e644625d3c1D11ACF1a5fd", // 你刚才部署成功的合约
-	    RPCUrl:       os.Getenv("RPC_URL"),
-	    PrivateKey:   os.Getenv("BACKEND_PRIVATE_KEY"), // 用中继器私钥发送
+	// ========================================
+	// ?PublisherHandler
+	// ========================================
+	publisherH := &handlers.PublisherHandler{
+		RDB: rdb,
+		Client: client,
+		FactoryAddr: os.Getenv("FACTORY_CONTRACT"), // 
 	}
 	// ========================================
-	// 5. 注册路由
+	// 5. 
 	// ========================================
 	r := mux.NewRouter()
 	r.Use(requestLoggerMiddleware)
 
-	// 身份验证路由
+	// 
 	r.HandleFunc("/secret/get-binding", authH.GetBinding).Methods("GET", "OPTIONS")
 	r.HandleFunc("/secret/verify", authH.Verify).Methods("GET", "OPTIONS")
 
-	// Relay 业务路由
+	// Relay 
 	r.HandleFunc("/relay/save-code", relayH.SaveCode).Methods("POST", "OPTIONS")
 	r.HandleFunc("/relay/reward", relayH.Reward).Methods("POST", "OPTIONS")
-	r.HandleFunc("/relay/stats", relayH.GetReferrerStats).Methods("GET", "OPTIONS") // 保留原推荐人接口
+	r.HandleFunc("/relay/stats", relayH.GetReferrerStats).Methods("GET", "OPTIONS")
 
-	// NFT 铸造路由
-	r.HandleFunc("/relay/mint", mintH.Mint).Methods("POST", "OPTIONS")
+	// NFT ?	r.HandleFunc("/relay/mint", mintH.Mint).Methods("POST", "OPTIONS")
 	r.HandleFunc("/api/v1/nft/total-minted", mintH.GetTotalMinted).Methods("GET", "OPTIONS")
 
-	// 大盘市场路由
+	// 
 	r.HandleFunc("/api/v1/tickers", marketH.GetTickers).Methods("GET", "OPTIONS")
 	r.HandleFunc("/api/v1/market/tickers", marketH.GetTickers).Methods("GET", "OPTIONS")
-        r.HandleFunc("/api/v1/endgame/bet", endGameH.Bet).Methods("POST", "OPTIONS")
-	r.HandleFunc("/api/v1/endgame/challenge", endGameH.Challenge).Methods("POST", "OPTIONS")
-	r.HandleFunc("/api/v1/endgame/settle", endGameH.Settle).Methods("POST", "OPTIONS")
-	
-	// 工厂合约路由
+
+	// 
 	r.HandleFunc("/api/v1/precheck-code", factoryH.PrecheckCode).Methods("GET", "OPTIONS")
 	r.HandleFunc("/api/v1/factory/verify-publisher", factoryH.VerifyPublisher).Methods("GET", "OPTIONS")
 	r.HandleFunc("/api/v1/factory/create", factoryH.CreateBook).Methods("POST", "OPTIONS")
 	r.HandleFunc("/api/v1/factory/deploy-book", factoryH.DeployBook).Methods("POST", "OPTIONS")
 	r.HandleFunc("/api/v1/publisher/balance", factoryH.GetPublisherBalance).Methods("GET", "OPTIONS")
 
-	// 数据分析路由
+	// 
 	r.HandleFunc("/api/v1/analytics/distribution", relayH.GetDistribution).Methods("GET", "OPTIONS")
 	r.HandleFunc("/api/v1/reader/location", mintH.GetReaderLocation).Methods("GET", "OPTIONS")
 
-	// 新增热力图接口
-	r.HandleFunc("/api/v1/analytics/heatmap", getHeatmapHandler).Methods("GET", "OPTIONS")
-
-	// 管理员路由
-	r.HandleFunc("/api/admin/check-access", authH.CheckAdminAccess).Methods("GET", "OPTIONS")
-
-	// ========================================
-	// 6. 启动服务
+	// ?	r.HandleFunc("/api/admin/check-access", authH.CheckAdminAccess).Methods("GET", "OPTIONS")
+    r.HandleFunc("/api/v1/publisher/deploy-book", publisherH.CreateBook).Methods("POST", "OPTIONS") //?	// ========================================
+	// 6. 
 	// ========================================
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
-	fmt.Printf("🚀 Whale Vault 后端启动成功 (监听端口: %s)\n", port)
+	fmt.Printf(" Whale Vault  (: %s)\n", port)
 
 	srv := &http.Server{
 		Addr:    "0.0.0.0:" + port,
@@ -171,11 +158,11 @@ func main() {
 }
 
 // ========================================
-// 中间件
-// ========================================
+// ?// ========================================
+
 func requestLoggerMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Printf("🔔 [REQ] %s %s | From: %s\n", r.Method, r.URL.Path, r.RemoteAddr)
+		fmt.Printf(" [REQ] %s %s | From: %s\n", r.Method, r.URL.Path, r.RemoteAddr)
 		next.ServeHTTP(w, r)
 	})
 }
@@ -194,8 +181,9 @@ func corsMiddleware(h http.Handler) http.Handler {
 }
 
 // ========================================
-// 工具函数
+// 
 // ========================================
+
 func GetClientIP(r *http.Request) string {
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 		parts := strings.Split(xff, ",")
@@ -219,43 +207,3 @@ func DeriveAddressFromPrivateKey(privateKeyHex string) string {
 	return crypto.PubkeyToAddress(privateKey.PublicKey).Hex()
 }
 
-// ========================================
-// 热力图处理器
-// ========================================
-type MapNode struct {
-	Name  string    `json:"name"`
-	Value []float64 `json:"value"` // [lng, lat, count]
-}
-
-func getHeatmapHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Content-Type", "application/json")
-
-	res, err := rdb.HGetAll(ctx, "vault:heatmap:locations").Result()
-	if err != nil {
-		http.Error(w, "Redis 读取失败: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	var data []MapNode
-	for key, val := range res {
-		parts := strings.Split(val, ",")
-		if len(parts) < 3 {
-			continue
-		}
-		lng, _ := strconv.ParseFloat(parts[0], 64)
-		lat, _ := strconv.ParseFloat(parts[1], 64)
-		cnt, _ := strconv.ParseFloat(parts[2], 64)
-
-		city := strings.Split(key, "_")[0]
-		data = append(data, MapNode{
-			Name:  city,
-			Value: []float64{lng, lat, cnt},
-		})
-	}
-
-	if data == nil {
-		data = []MapNode{}
-	}
-	json.NewEncoder(w).Encode(data)
-}

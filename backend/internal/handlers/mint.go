@@ -3,78 +3,203 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"errors"
+	"fmt"
 	"net/http"
+	"os"
+	"os/exec"
 	"strings"
+//	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/redis/go-redis/v9"
 )
 
+var (
+	mintSemaphore = make(chan struct{}, 5) // 并发保护：最多 5 笔 mint 同时进行
+)
+
+// ==============================
+// MintHandler
+// ==============================
 type MintHandler struct {
 	RDB    *redis.Client
 	Client *ethclient.Client
 }
 
+// ==============================
+// HTTP Handler: Mint NFT
+// POST /relay/mint
+// ==============================
 func (h *MintHandler) Mint(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		CodeHash string `json:"codeHash"`
-		Address  string `json:"address"`
+	type MintReq struct {
+		BookAddress   string `json:"book_address"`
+		ReaderAddress string `json:"reader_address"`
 	}
+
+	var req MintReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.sendJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "无效的请求格式"})
+		writeErr(w, "BAD_REQUEST", "invalid json body")
 		return
 	}
 
-	codeHash := strings.ToLower(strings.TrimSpace(req.CodeHash))
-	address := strings.ToLower(strings.TrimSpace(req.Address))
-	if codeHash == "" || address == "" {
-		h.sendJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "缺少必要参数"})
+	if req.BookAddress == "" || req.ReaderAddress == "" {
+		writeErr(w, "BAD_REQUEST", "missing book_address or reader_address")
 		return
 	}
 
-	ctx := context.Background()
-	if isUsed, _ := h.RDB.SIsMember(ctx, "vault:codes:used", codeHash).Result(); isUsed {
-		h.sendJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "该激活码已被使用"})
-		return
-	}
-	if isValid, _ := h.RDB.SIsMember(ctx, "vault:codes:valid", codeHash).Result(); !isValid {
-		h.sendJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "无效的激活码"})
+	// 并发保护
+	select {
+	case mintSemaphore <- struct{}{}:
+		defer func() { <-mintSemaphore }()
+	default:
+		writeErr(w, "BUSY", "mint service busy, retry later")
 		return
 	}
 
-	pipe := h.RDB.Pipeline()
-	pipe.SRem(ctx, "vault:codes:valid", codeHash)
-	pipe.SAdd(ctx, "vault:codes:used", codeHash)
-	pipe.Exec(ctx)
+	// 超时控制
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
 
-	log.Printf("✅ NFT 铸造成功: codeHash=%s, address=%s", codeHash, address)
-	h.sendJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "message": "NFT 铸造成功", "txHash": "0x" + codeHash[:16] + "..."})
+	txHash, err := mintByCast(ctx, req.BookAddress, req.ReaderAddress)
+	if err != nil {
+		mapMintError(w, err)
+		return
+	}
+
+	writeOK(w, map[string]string{
+		"tx_hash": txHash,
+	})
 }
 
+// ==============================
+// 核心：通过 Foundry cast mint
+// ==============================
+func mintByCast(
+	ctx context.Context,
+	bookAddr string,
+	readerAddr string,
+) (string, error) {
+
+	castBin := foundryCastPath()
+
+	privateKey := os.Getenv("RELAYER_PRIVATE_KEY")
+	rpcURL := os.Getenv("RPC_URL")
+
+	if privateKey == "" || rpcURL == "" {
+		return "", errors.New("CONFIG_MISSING")
+	}
+
+	cmd := exec.CommandContext(
+		ctx,
+		castBin,
+		"send",
+		bookAddr,
+		"mintToReader(address)",
+		readerAddr,
+		"--private-key", privateKey,
+		"--rpc-url", rpcURL,
+		"--legacy",
+	)
+
+	var stdout, stderr strings.Builder
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	if err != nil {
+		return "", parseCastError(stderr.String())
+	}
+
+	out := stdout.String()
+
+	// 从 cast 输出中提取 tx hash
+	for _, line := range strings.Split(out, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "transactionHash") {
+			parts := strings.Fields(line)
+			return parts[len(parts)-1], nil
+		}
+	}
+
+	return "", errors.New("TX_HASH_NOT_FOUND")
+}
+
+// ==============================
+// Foundry 路径 util（未来可替换 AA）
+// ==============================
+func foundryCastPath() string {
+	if p := os.Getenv("CAST_BIN"); p != "" {
+		return p
+	}
+	return "cast" // 默认依赖 PATH
+}
+
+// ==============================
+// cast stderr → 结构化错误
+// ==============================
+func parseCastError(stderr string) error {
+	s := strings.ToLower(stderr)
+
+	switch {
+	case strings.Contains(s, "already minted"):
+		return errors.New("ALREADY_MINTED")
+	case strings.Contains(s, "revert"):
+		return errors.New("EVM_REVERT")
+	case strings.Contains(s, "insufficient funds"):
+		return errors.New("INSUFFICIENT_GAS")
+	case strings.Contains(s, "execution reverted"):
+		return errors.New("EXECUTION_REVERTED")
+	case strings.Contains(s, "nonce"):
+		return errors.New("NONCE_ERROR")
+	default:
+		return fmt.Errorf("CAST_ERROR: %s", stderr)
+	}
+}
+
+// ==============================
+// 其他接口（保留，避免破坏 main.go）
+// ==============================
+
 func (h *MintHandler) GetTotalMinted(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
-	usedCount, _ := h.RDB.SCard(ctx, "vault:codes:used").Result()
-	h.sendJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "totalMinted": usedCount})
+	writeOK(w, map[string]int{"total": 0})
 }
 
 func (h *MintHandler) GetReaderLocation(w http.ResponseWriter, r *http.Request) {
-	address := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("address")))
-	if address == "" {
-		h.sendJSON(w, http.StatusBadRequest, map[string]interface{}{"ok": false, "error": "缺少 address 参数"})
-		return
-	}
-	ctx := context.Background()
-	ip, err := h.RDB.HGet(ctx, "vault:reader:locations", address).Result()
-	if err != nil {
-		h.sendJSON(w, http.StatusNotFound, map[string]interface{}{"ok": false, "error": "未找到位置信息"})
-		return
-	}
-	h.sendJSON(w, http.StatusOK, map[string]interface{}{"ok": true, "ip": ip})
+	writeOK(w, map[string]string{"location": "unknown"})
 }
 
-func (h *MintHandler) sendJSON(w http.ResponseWriter, code int, payload interface{}) {
+// ==============================
+// HTTP 工具
+// ==============================
+func writeOK(w http.ResponseWriter, data any) {
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(payload)
+	json.NewEncoder(w).Encode(map[string]any{
+		"ok":   true,
+		"data": data,
+	})
+}
+
+func writeErr(w http.ResponseWriter, code string, msg string) {
+	w.WriteHeader(http.StatusBadRequest)
+	json.NewEncoder(w).Encode(map[string]any{
+		"ok":    false,
+		"code":  code,
+		"error": msg,
+	})
+}
+
+func mapMintError(w http.ResponseWriter, err error) {
+	switch err.Error() {
+	case "ALREADY_MINTED":
+		writeErr(w, "ALREADY_MINTED", "reader already minted this nft")
+	case "INSUFFICIENT_GAS":
+		writeErr(w, "INSUFFICIENT_GAS", "relayer gas insufficient")
+	case "NONCE_ERROR":
+		writeErr(w, "NONCE_ERROR", "nonce conflict, retry")
+	case "EVM_REVERT", "EXECUTION_REVERTED":
+		writeErr(w, "REVERT", "contract reverted")
+	default:
+		writeErr(w, "CAST_FAILED", err.Error())
+	}
 }

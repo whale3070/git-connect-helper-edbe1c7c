@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"math/big"
@@ -17,7 +16,6 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
 
-	"whale-vault/relay/internal/blockchain"
 	"whale-vault/relay/internal/handlers"
 )
 
@@ -66,101 +64,107 @@ func main() {
 	handlers.LoadRelayers(client, chainID)
 
 	// ========================================
-	// 3. 初始化 RewardService
+	// 3. 实例化业务处理器 (依赖注入)
 	// ========================================
-	rewardSvc := &blockchain.RewardService{
-		Client:      client,
-		Redis:       rdb,
-		BackendKey:  os.Getenv("BACKEND_PRIVATE_KEY"),
-		ContractHex: os.Getenv("CONTRACT_ADDRESS"),
-	}
 
-	// ========================================
-	// 4. 实例化业务处理器 (依赖注入)
-	// ========================================
+	// 读者端处理器 (扫码、验证、兑奖)
 	relayH := &handlers.RelayHandler{
-		RDB:       rdb,
-		Client:    client,
-		RewardSvc: rewardSvc,
+		RDB:    rdb,
+		Client: client,
 	}
 
+	// 大盘市场处理器 (书籍排行榜)
 	marketH := &handlers.MarketHandler{
 		RDB: rdb,
 	}
 
+	// 工厂合约处理器 (部署新书合约)
 	factoryH := &handlers.FactoryHandler{
 		RDB:     rdb,
 		Client:  client,
 		ChainID: chainID,
 	}
 
+	// NFT 铸造处理器
 	mintH := &handlers.MintHandler{
 		RDB:    rdb,
 		Client: client,
 	}
 
+	// 身份验证处理器
 	authH := &handlers.AuthHandler{
 		RDB:    rdb,
 		Client: client,
 	}
 
-	// 新增 EndGameHandler
-	endGameH := &handlers.EndGameHandler{
-	    RDB:          rdb,
-	    ContractAddr: "0x9D014a4401E81aa0e9e644625d3c1D11ACF1a5fd", // 你刚才部署成功的合约
-	    RPCUrl:       os.Getenv("RPC_URL"),
-	    PrivateKey:   os.Getenv("BACKEND_PRIVATE_KEY"), // 用中继器私钥发送
-	}
 	// ========================================
-	// 5. 注册路由
+	// 4. 注册路由
 	// ========================================
 	r := mux.NewRouter()
+
+	// 全局请求日志中间件
 	r.Use(requestLoggerMiddleware)
 
-	// 身份验证路由
+	// --- 身份验证路由 ---
+	// GET  /secret/get-binding      获取地址绑定信息
+	// GET  /secret/verify           验证激活码并分配角色
 	r.HandleFunc("/secret/get-binding", authH.GetBinding).Methods("GET", "OPTIONS")
 	r.HandleFunc("/secret/verify", authH.Verify).Methods("GET", "OPTIONS")
 
-	// Relay 业务路由
+	// --- 读者端路由 (Relay 业务) ---
+	// POST /relay/save-code         验证并暂存书码
+	// POST /relay/reward            执行 5 码兑换
+	// GET  /relay/stats             获取推荐人统计/排行榜
 	r.HandleFunc("/relay/save-code", relayH.SaveCode).Methods("POST", "OPTIONS")
 	r.HandleFunc("/relay/reward", relayH.Reward).Methods("POST", "OPTIONS")
-	r.HandleFunc("/relay/stats", relayH.GetReferrerStats).Methods("GET", "OPTIONS") // 保留原推荐人接口
+	r.HandleFunc("/relay/stats", relayH.GetReferrerStats).Methods("GET", "OPTIONS")
 
-	// NFT 铸造路由
+	// --- NFT 铸造路由 ---
+	// POST /relay/mint              铸造 NFT
+	// GET  /api/v1/nft/total-minted 获取链上总铸造量
 	r.HandleFunc("/relay/mint", mintH.Mint).Methods("POST", "OPTIONS")
 	r.HandleFunc("/api/v1/nft/total-minted", mintH.GetTotalMinted).Methods("GET", "OPTIONS")
+    // ✅ 新增：查询 mint 交易结果
+    //r.HandleFunc("/relay/tx/", mintH.GetTxResult).Methods("GET", "OPTIONS")
+	r.PathPrefix("/relay/tx/").HandlerFunc(mintH.GetTxResult).Methods("GET", "OPTIONS")
 
-	// 大盘市场路由
+	
+	// --- 大盘市场路由 ---
+	// GET /api/v1/tickers           获取书籍销量排行榜 (兼容旧路径)
+	// GET /api/v1/market/tickers    获取书籍销量排行榜
 	r.HandleFunc("/api/v1/tickers", marketH.GetTickers).Methods("GET", "OPTIONS")
 	r.HandleFunc("/api/v1/market/tickers", marketH.GetTickers).Methods("GET", "OPTIONS")
-        r.HandleFunc("/api/v1/endgame/bet", endGameH.Bet).Methods("POST", "OPTIONS")
-	r.HandleFunc("/api/v1/endgame/challenge", endGameH.Challenge).Methods("POST", "OPTIONS")
-	r.HandleFunc("/api/v1/endgame/settle", endGameH.Settle).Methods("POST", "OPTIONS")
-	
-	// 工厂合约路由
+
+	// --- 工厂合约路由 (出版社后端代签) ---
+	// GET  /api/v1/precheck-code          预检查激活码
+	// GET  /api/v1/factory/verify-publisher 验证出版社身份
+	// POST /api/v1/factory/create         创建书籍 (旧接口)
+	// POST /api/v1/factory/deploy-book    部署书籍合约
+	// GET  /api/v1/publisher/balance      查询出版社余额
 	r.HandleFunc("/api/v1/precheck-code", factoryH.PrecheckCode).Methods("GET", "OPTIONS")
 	r.HandleFunc("/api/v1/factory/verify-publisher", factoryH.VerifyPublisher).Methods("GET", "OPTIONS")
 	r.HandleFunc("/api/v1/factory/create", factoryH.CreateBook).Methods("POST", "OPTIONS")
 	r.HandleFunc("/api/v1/factory/deploy-book", factoryH.DeployBook).Methods("POST", "OPTIONS")
 	r.HandleFunc("/api/v1/publisher/balance", factoryH.GetPublisherBalance).Methods("GET", "OPTIONS")
 
-	// 数据分析路由
+	// --- 数据分析路由 ---
+	// GET /api/v1/analytics/distribution 获取读者地理分布热力图
+	// GET /api/v1/reader/location        获取当前读者位置
 	r.HandleFunc("/api/v1/analytics/distribution", relayH.GetDistribution).Methods("GET", "OPTIONS")
 	r.HandleFunc("/api/v1/reader/location", mintH.GetReaderLocation).Methods("GET", "OPTIONS")
 
-	// 新增热力图接口
-	r.HandleFunc("/api/v1/analytics/heatmap", getHeatmapHandler).Methods("GET", "OPTIONS")
-
-	// 管理员路由
+	// --- 管理员路由 ---
+	// GET /api/admin/check-access 检查管理员权限
 	r.HandleFunc("/api/admin/check-access", authH.CheckAdminAccess).Methods("GET", "OPTIONS")
 
 	// ========================================
-	// 6. 启动服务
+	// 5. 启动服务
 	// ========================================
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
+
 	fmt.Printf("🚀 Whale Vault 后端启动成功 (监听端口: %s)\n", port)
 
 	srv := &http.Server{
@@ -173,6 +177,8 @@ func main() {
 // ========================================
 // 中间件
 // ========================================
+
+// requestLoggerMiddleware 全局请求日志
 func requestLoggerMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("🔔 [REQ] %s %s | From: %s\n", r.Method, r.URL.Path, r.RemoteAddr)
@@ -180,6 +186,7 @@ func requestLoggerMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// corsMiddleware 跨域处理
 func corsMiddleware(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -194,8 +201,10 @@ func corsMiddleware(h http.Handler) http.Handler {
 }
 
 // ========================================
-// 工具函数
+// 工具函数 (供其他包使用)
 // ========================================
+
+// GetClientIP 获取客户端真实 IP
 func GetClientIP(r *http.Request) string {
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 		parts := strings.Split(xff, ",")
@@ -211,51 +220,11 @@ func GetClientIP(r *http.Request) string {
 	return ip
 }
 
+// DeriveAddressFromPrivateKey 从私钥推导地址
 func DeriveAddressFromPrivateKey(privateKeyHex string) string {
 	privateKey, err := crypto.HexToECDSA(strings.TrimPrefix(privateKeyHex, "0x"))
 	if err != nil {
 		return ""
 	}
 	return crypto.PubkeyToAddress(privateKey.PublicKey).Hex()
-}
-
-// ========================================
-// 热力图处理器
-// ========================================
-type MapNode struct {
-	Name  string    `json:"name"`
-	Value []float64 `json:"value"` // [lng, lat, count]
-}
-
-func getHeatmapHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Content-Type", "application/json")
-
-	res, err := rdb.HGetAll(ctx, "vault:heatmap:locations").Result()
-	if err != nil {
-		http.Error(w, "Redis 读取失败: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	var data []MapNode
-	for key, val := range res {
-		parts := strings.Split(val, ",")
-		if len(parts) < 3 {
-			continue
-		}
-		lng, _ := strconv.ParseFloat(parts[0], 64)
-		lat, _ := strconv.ParseFloat(parts[1], 64)
-		cnt, _ := strconv.ParseFloat(parts[2], 64)
-
-		city := strings.Split(key, "_")[0]
-		data = append(data, MapNode{
-			Name:  city,
-			Value: []float64{lng, lat, cnt},
-		})
-	}
-
-	if data == nil {
-		data = []MapNode{}
-	}
-	json.NewEncoder(w).Encode(data)
 }
