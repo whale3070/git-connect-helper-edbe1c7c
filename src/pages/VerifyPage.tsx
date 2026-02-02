@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { mockDelay, getRandomBook, MOCK_BOOKS } from '../data/mockData';
+import { mockDelay } from '../data/mockData';
+import { useAppMode } from '../contexts/AppModeContext';
+import { BACKEND_URL } from '../config/backend';
 
 interface VerifyPageProps {
   onVerify?: (address: string, codeHash: string) => Promise<'publisher' | 'author' | 'reader' | null>;
@@ -9,6 +11,7 @@ interface VerifyPageProps {
 const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
   const navigate = useNavigate();
   const { hash } = useParams<{ hash: string }>(); 
+  const { isMockMode } = useAppMode();
 
   const [codeHash] = useState(hash || '');
   const [targetAddress, setTargetAddress] = useState('');
@@ -25,38 +28,77 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
         return;
       }
       
-      // ========== MOCK 模式：模拟验证逻辑 ==========
-      await mockDelay(1000); // 模拟网络延迟
-      
-      // 基于 codeHash 模拟不同角色
-      // 以 'pub' 开头 = 出版社，'auth' 开头 = 作者，其他 = 读者
-      // 以 'invalid' 开头 = 无效码
-      const lowerHash = codeHash.toLowerCase();
-      
-      if (lowerHash.startsWith('invalid') || lowerHash.length < 8) {
-        setInvalidCode(true);
+      if (isMockMode) {
+        // ========== MOCK 模式：模拟验证逻辑 ==========
+        await mockDelay(1000);
+        
+        const lowerHash = codeHash.toLowerCase();
+        
+        if (lowerHash.startsWith('invalid') || lowerHash.length < 8) {
+          setInvalidCode(true);
+          setLoading(false);
+          return;
+        }
+        
+        const mockAddress = `0x${codeHash.slice(0, 40).padEnd(40, '0')}`;
+        setTargetAddress(mockAddress);
+        
+        if (lowerHash.startsWith('pub')) {
+          setRole('publisher');
+        } else if (lowerHash.startsWith('auth')) {
+          setRole('author');
+        } else {
+          setRole('reader');
+        }
+        
         setLoading(false);
-        return;
-      }
-      
-      // 生成模拟地址
-      const mockAddress = `0x${codeHash.slice(0, 40).padEnd(40, '0')}`;
-      setTargetAddress(mockAddress);
-      
-      // 模拟角色判断
-      if (lowerHash.startsWith('pub')) {
-        setRole('publisher');
-      } else if (lowerHash.startsWith('auth')) {
-        setRole('author');
       } else {
-        setRole('reader');
+        // ========== DEV 模式：真实 API 调用 ==========
+        try {
+          // 1. 验证 codeHash 是否存在于 Redis
+          const verifyResp = await fetch(`${BACKEND_URL}/secret/verify?codeHash=${codeHash}`);
+          
+          if (verifyResp.status === 403 || verifyResp.status === 404) {
+            setInvalidCode(true);
+            setLoading(false);
+            return;
+          }
+          
+          if (!verifyResp.ok) {
+            throw new Error(`验证失败: ${verifyResp.status}`);
+          }
+          
+          const verifyData = await verifyResp.json();
+          
+          // 2. 获取绑定的地址
+          const bindResp = await fetch(`${BACKEND_URL}/secret/get-binding?codeHash=${codeHash}`);
+          if (bindResp.ok) {
+            const bindData = await bindResp.json();
+            if (bindData.address) {
+              setTargetAddress(bindData.address);
+            }
+          }
+          
+          // 3. 设置角色
+          if (verifyData.role === 'publisher') {
+            setRole('publisher');
+          } else if (verifyData.role === 'author') {
+            setRole('author');
+          } else {
+            setRole('reader');
+          }
+          
+          setLoading(false);
+        } catch (e: any) {
+          console.error('API 验证失败:', e);
+          setError(e.message || '网络异常，请确认后端已启动');
+          setLoading(false);
+        }
       }
-      
-      setLoading(false);
     };
     
     initTerminal();
-  }, [codeHash]);
+  }, [codeHash, isMockMode]);
 
   const confirmAndGoToMint = () => {
     console.log("理智抉择：确认无推荐人或已登记，进入铸造流程。");
@@ -74,13 +116,17 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
           </div>
           <h1 className="text-xl font-bold text-white">无效的二维码</h1>
           <p className="text-sm text-gray-400 leading-relaxed">
-            该二维码无效或已被使用。请确认您扫描的是正版商品附带的二维码。
+            {isMockMode 
+              ? '该二维码无效或已被使用。请确认您扫描的是正版商品附带的二维码。'
+              : '该二维码在系统中不存在。请购买正版书籍获取有效的激活码。'}
           </p>
-          <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-4">
-            <p className="text-xs text-yellow-500/80 font-medium">
-              ⚠️ DEMO 模式：使用有效格式的 hash 进行测试
-            </p>
-          </div>
+          {isMockMode && (
+            <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-4">
+              <p className="text-xs text-yellow-500/80 font-medium">
+                ⚠️ DEMO 模式：使用有效格式的 hash 进行测试
+              </p>
+            </div>
+          )}
           <button 
             onClick={() => navigate('/bookshelf')}
             className="w-full py-4 rounded-xl bg-white/5 text-white font-bold text-sm uppercase tracking-widest hover:bg-white/10 transition-all active:scale-95"
@@ -89,7 +135,7 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
           </button>
         </div>
         <div className="mt-10 text-[9px] text-gray-600 uppercase tracking-[0.4em] font-medium">
-          Whale Vault Protocol <span className="mx-2">•</span> DEMO MODE
+          Whale Vault Protocol <span className="mx-2">•</span> {isMockMode ? 'DEMO MODE' : 'DEV API'}
         </div>
       </div>
     );
@@ -144,9 +190,11 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
           role === 'publisher' ? 'via-purple-500' : role === 'author' ? 'via-orange-500' : 'via-blue-500'
         } to-transparent opacity-50`} />
 
-        {/* Demo 标识 */}
-        <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-lg p-2 text-center">
-          <p className="text-[10px] text-cyan-400 font-bold uppercase tracking-wider">🔧 Demo Mode - Mock Data</p>
+        {/* 模式标识 */}
+        <div className={`${isMockMode ? 'bg-cyan-500/10 border-cyan-500/20' : 'bg-green-500/10 border-green-500/20'} border rounded-lg p-2 text-center`}>
+          <p className={`text-[10px] font-bold uppercase tracking-wider ${isMockMode ? 'text-cyan-400' : 'text-green-400'}`}>
+            {isMockMode ? '🔧 Demo Mode - Mock Data' : '🟢 Dev API - Redis 验证'}
+          </p>
         </div>
 
         <div className="text-center space-y-4">
@@ -257,7 +305,7 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
       )}
       
       <div className="mt-12 text-[9px] text-gray-600 uppercase tracking-[0.4em] font-medium text-center">
-        Whale Vault Protocol <span className="mx-2">•</span> DEMO MODE
+        Whale Vault Protocol <span className="mx-2">•</span> {isMockMode ? 'DEMO MODE' : 'DEV API'}
       </div>
     </div>
   );
