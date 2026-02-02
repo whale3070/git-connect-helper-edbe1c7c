@@ -1,45 +1,204 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { CheckCircle, ShieldCheck, ExternalLink, Loader2, Megaphone, Users, LineChart, MessageSquare, MapPin, Globe } from 'lucide-react';
+import { CheckCircle, ShieldCheck, ExternalLink, Loader2, Users, LineChart, MapPin, Globe, RefreshCw, Clock, AlertCircle } from 'lucide-react';
 import { useAppMode } from '../contexts/AppModeContext';
 import { mockDelay, MOCK_REGIONS, getRandomBook } from '../data/mockData';
+import { useApi } from '../hooks/useApi';
+
+type TxStatus = 'pending' | 'syncing' | 'success' | 'failed';
+
+interface TxData {
+  status: string;
+  tokenId: string;
+  reader: string;
+  contract: string;
+  txHash: string;
+  cached?: boolean;
+}
 
 const Success = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { isMockMode } = useAppMode();
+  const { queryTransaction } = useApi();
   
   const txHash = searchParams.get('txHash');
   const userAddress = (searchParams.get('address') || '0x' + 'a'.repeat(40)).toLowerCase();
   const codeHash = searchParams.get('codeHash');
-  const rawTokenId = searchParams.get('token_id');
-  const displayTokenId = (!rawTokenId || rawTokenId === '0') ? `#${Math.floor(Math.random() * 10000)}` : `#${rawTokenId}`;
+  const initialStatus = searchParams.get('status') as TxStatus || 'pending';
 
-  const [isLoading, setIsLoading] = useState(true);
+  const [txStatus, setTxStatus] = useState<TxStatus>(initialStatus);
+  const [txData, setTxData] = useState<TxData | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [totalMinted, setTotalMinted] = useState<number | null>(null);
   const [userLocation, setUserLocation] = useState<string | null>(null);
   const [mintedBook, setMintedBook] = useState(getRandomBook());
+  const [lastChecked, setLastChecked] = useState<Date | null>(null);
 
+  // 查询交易状态
+  const checkTxStatus = useCallback(async () => {
+    if (!txHash) return;
+    
+    setIsRefreshing(true);
+    setTxStatus('syncing');
+    
+    try {
+      const result = await queryTransaction(txHash);
+      setLastChecked(new Date());
+      
+      if (result.ok && result.data) {
+        setTxData({
+          status: result.data.status,
+          tokenId: result.data.tokenId || '0',
+          reader: result.data.reader || userAddress,
+          contract: result.data.contract || '',
+          txHash: result.data.txHash || txHash,
+          cached: (result.data as any).cached,
+        });
+        
+        if (result.data.status === 'SUCCESS') {
+          setTxStatus('success');
+          // 成功后模拟加载额外数据
+          await mockDelay(500);
+          setTotalMinted(Math.floor(Math.random() * 5000) + 1000);
+          const randomLocation = MOCK_REGIONS[Math.floor(Math.random() * MOCK_REGIONS.length)];
+          setUserLocation(randomLocation.name);
+        } else if (result.data.status === 'FAILED') {
+          setTxStatus('failed');
+        } else {
+          setTxStatus('pending');
+        }
+      }
+    } catch (e: any) {
+      console.error('查询交易状态失败:', e);
+      setTxStatus('pending');
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [txHash, queryTransaction, userAddress]);
+
+  // 初始加载
   useEffect(() => {
-    const simulateDataFetch = async () => {
-      await mockDelay(1200);
-      setTotalMinted(Math.floor(Math.random() * 5000) + 1000);
-      const randomLocation = MOCK_REGIONS[Math.floor(Math.random() * MOCK_REGIONS.length)];
-      setUserLocation(randomLocation.name);
-      setIsLoading(false);
-    };
-    simulateDataFetch();
-  }, []);
+    if (initialStatus === 'pending') {
+      // 如果是pending状态，显示同步中提示
+      setTxStatus('pending');
+    }
+  }, [initialStatus]);
 
-  if (isLoading) {
+  const displayTokenId = txData?.tokenId && txData.tokenId !== '0' 
+    ? `#${txData.tokenId}` 
+    : '#---';
+
+  // 待确认状态 UI
+  if (txStatus === 'pending' || txStatus === 'syncing') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col items-center justify-center">
-        <Loader2 className="w-12 h-12 text-indigo-500 animate-spin mb-4" />
-        <p className="text-slate-400 uppercase tracking-widest text-xs">正在同步数据...</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col items-center py-12 px-4">
+        <div className="max-w-md w-full space-y-8">
+          
+          <div className={`${isMockMode ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'} border rounded-lg p-2 text-center`}>
+            <p className={`text-xs font-semibold uppercase tracking-wider ${isMockMode ? 'text-amber-700' : 'text-emerald-700'}`}>
+              {isMockMode ? '🔧 Demo Mode' : '🟢 Dev API'}
+            </p>
+          </div>
+
+          <div className="text-center space-y-4">
+            <div className="flex justify-center relative">
+              <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center">
+                <Clock className="w-8 h-8 text-amber-600 animate-pulse" />
+              </div>
+            </div>
+            <h2 className="text-2xl font-black text-slate-800">交易已提交</h2>
+            <p className="text-slate-500 text-sm">区块链数据同步中...</p>
+          </div>
+
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <Loader2 className={`w-5 h-5 text-amber-600 ${txStatus === 'syncing' ? 'animate-spin' : ''}`} />
+              <div>
+                <p className="text-sm font-bold text-slate-800">等待区块确认</p>
+                <p className="text-xs text-slate-500">通常需要 1-5 分钟完成铸造并通知所有区块</p>
+              </div>
+            </div>
+            
+            {txHash && (
+              <div className="bg-white rounded-xl p-4 border border-amber-100">
+                <p className="text-xs text-slate-400 uppercase font-semibold mb-1">交易哈希</p>
+                <p className="text-xs text-slate-600 font-mono break-all">{txHash}</p>
+              </div>
+            )}
+
+            {lastChecked && (
+              <p className="text-xs text-slate-400 text-center">
+                上次检查: {lastChecked.toLocaleTimeString()}
+              </p>
+            )}
+          </div>
+
+          <button
+            onClick={checkTxStatus}
+            disabled={isRefreshing}
+            className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold text-sm uppercase tracking-widest hover:from-indigo-600 hover:to-purple-600 transition-all disabled:opacity-50"
+          >
+            <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            {isRefreshing ? '正在查询...' : '刷新状态'}
+          </button>
+
+          <button
+            onClick={checkTxStatus}
+            disabled={isRefreshing}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-white border border-slate-200 text-slate-600 font-medium text-sm hover:bg-slate-50 transition-all"
+          >
+            <ExternalLink className="w-4 h-4" />
+            链上哈希核验
+          </button>
+
+          <div className="text-center">
+            <button 
+              onClick={() => navigate('/bookshelf')}
+              className="text-xs text-slate-400 hover:text-indigo-600 transition-colors uppercase tracking-widest"
+            >
+              返回书架
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
 
+  // 失败状态 UI
+  if (txStatus === 'failed') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col items-center py-12 px-4">
+        <div className="max-w-md w-full space-y-8">
+          <div className="text-center space-y-4">
+            <div className="flex justify-center">
+              <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center">
+                <AlertCircle className="w-8 h-8 text-red-600" />
+              </div>
+            </div>
+            <h2 className="text-2xl font-black text-slate-800">交易失败</h2>
+            <p className="text-slate-500 text-sm">链上交易未能成功执行</p>
+          </div>
+
+          {txHash && (
+            <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+              <p className="text-xs text-slate-400 uppercase font-semibold mb-1">交易哈希</p>
+              <p className="text-xs text-slate-600 font-mono break-all">{txHash}</p>
+            </div>
+          )}
+
+          <button
+            onClick={() => navigate('/bookshelf')}
+            className="w-full py-4 rounded-2xl bg-slate-100 text-slate-700 font-bold text-sm uppercase tracking-widest hover:bg-slate-200 transition-all"
+          >
+            返回书架
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 成功状态 UI
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col items-center py-12 px-4">
       <div className="max-w-md w-full space-y-8">
@@ -94,8 +253,19 @@ const Success = () => {
           </div>
           <div className="space-y-1">
             <span className="text-xs text-slate-400 uppercase font-semibold">绑定地址</span>
-            <p className="text-xs text-slate-500 font-mono break-all">{userAddress}</p>
+            <p className="text-xs text-slate-500 font-mono break-all">{txData?.reader || userAddress}</p>
           </div>
+          {txData?.contract && (
+            <div className="space-y-1">
+              <span className="text-xs text-slate-400 uppercase font-semibold">合约地址</span>
+              <p className="text-xs text-slate-500 font-mono break-all">{txData.contract}</p>
+            </div>
+          )}
+          {txData?.cached && (
+            <div className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded inline-block">
+              ⚡ 缓存数据
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 gap-3">
@@ -128,8 +298,21 @@ const Success = () => {
 
         {txHash && (
           <div className="pt-4 text-center">
-            <button onClick={() => alert(`TX Hash:\n${txHash}`)} className="text-xs text-slate-400 hover:text-indigo-600 transition-colors inline-flex items-center gap-1.5 uppercase tracking-widest">
-              链上哈希核验 <ExternalLink className="w-3 h-3" />
+            <button 
+              onClick={checkTxStatus}
+              disabled={isRefreshing}
+              className="text-xs text-slate-400 hover:text-indigo-600 transition-colors inline-flex items-center gap-1.5 uppercase tracking-widest disabled:opacity-50"
+            >
+              {isRefreshing ? (
+                <>
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  查询中...
+                </>
+              ) : (
+                <>
+                  链上哈希核验 <ExternalLink className="w-3 h-3" />
+                </>
+              )}
             </button>
           </div>
         )}
