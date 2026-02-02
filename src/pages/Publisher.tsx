@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MOCK_BOOKS, MOCK_REGIONS, mockDelay, generateFakeTxHash, getTotalSales } from '../data/mockData';
+import { useAppMode } from '../contexts/AppModeContext';
+import { useApi } from '../hooks/useApi';
+import { MOCK_BOOKS, MOCK_REGIONS, generateFakeTxHash, getTotalSales } from '../data/mockData';
 import { showToast, ToastContainer } from '../components/ui/CyberpunkToast';
 
-// Mock 书籍销量数据结构
+// 书籍销量数据结构
 interface BookSales {
   address: string;
   symbol: string;
@@ -13,7 +15,7 @@ interface BookSales {
   explorerUrl: string;
 }
 
-// Mock 地区排名数据结构
+// 地区排名数据结构
 interface RegionRank {
   region: string;
   count: number;
@@ -21,6 +23,9 @@ interface RegionRank {
 
 const Publisher: React.FC = () => {
   const navigate = useNavigate();
+  const { isMockMode, apiBaseUrl } = useAppMode();
+  const { deployBook, getPublisherBalance, fetchHeatmapData } = useApi();
+  
   const [loading, setLoading] = useState(true);
   const [opLoading, setOpLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,15 +35,17 @@ const Publisher: React.FC = () => {
   const [bookName, setBookName] = useState<string>('');
   const [author, setAuthor] = useState<string>('');
   const [symbol, setSymbol] = useState<string>('');
+  const [serial, setSerial] = useState<string>('');
+  const [privKey, setPrivKey] = useState<string>('');
   const [contractAddr, setContractAddr] = useState<string | null>(null);
   const [count, setCount] = useState<number>(100);
   
   // 出版社地址
   const [pubAddress, setPubAddress] = useState<string>('');
   
-  // Mock 钱包余额
-  const [balanceCFX, setBalanceCFX] = useState<number>(125.50);
-  const [maxDeploys, setMaxDeploys] = useState<number>(12);
+  // 钱包余额
+  const [balanceCFX, setBalanceCFX] = useState<number>(0);
+  const [maxDeploys, setMaxDeploys] = useState<number>(0);
   const [balanceLoading, setBalanceLoading] = useState<boolean>(false);
 
   // 销量数据
@@ -68,41 +75,80 @@ const Publisher: React.FC = () => {
     initPublisher();
   }, []);
 
-  // Mock: 获取仪表盘数据
+  // 获取仪表盘数据
   const fetchDashboardData = async () => {
-    await mockDelay(800);
-    
-    // 从 Mock 数据生成销量列表
-    const salesData: BookSales[] = MOCK_BOOKS.map((book) => ({
-      address: `0x${book.id}${'0'.repeat(40 - book.id.length)}`,
-      symbol: book.symbol,
-      name: book.title,
-      author: book.author,
-      sales: book.sales,
-      explorerUrl: `#` // Demo 模式
-    }));
-    
-    setBookSales(salesData);
-    setTotalSales(getTotalSales());
-    
-    // 从 Mock 区域数据生成排行
-    const ranked: RegionRank[] = MOCK_REGIONS
-      .map(r => ({ region: r.name, count: r.value[2] }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
-    setRegionRanks(ranked);
+    try {
+      // 生成销量列表 (目前后端无专用接口，使用 Mock)
+      const salesData: BookSales[] = MOCK_BOOKS.map((book) => ({
+        address: `0x${book.id}${'0'.repeat(40 - book.id.length)}`,
+        symbol: book.symbol,
+        name: book.title,
+        author: book.author,
+        sales: book.sales,
+        explorerUrl: isMockMode ? '#' : `https://evm.confluxscan.net/address/${book.id}`
+      }));
+      
+      setBookSales(salesData);
+      setTotalSales(getTotalSales());
+      
+      // 获取热力图数据
+      const heatmapResult = await fetchHeatmapData();
+      if (heatmapResult.ok && heatmapResult.regions) {
+        const ranked: RegionRank[] = heatmapResult.regions
+          .map(r => ({ region: r.name, count: r.value[2] }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 10);
+        setRegionRanks(ranked);
+      } else {
+        // 降级使用 Mock
+        const ranked: RegionRank[] = MOCK_REGIONS
+          .map(r => ({ region: r.name, count: r.value[2] }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 10);
+        setRegionRanks(ranked);
+      }
+    } catch (e: any) {
+      console.error('获取仪表盘数据失败:', e);
+      // 降级使用 Mock 数据
+      const salesData: BookSales[] = MOCK_BOOKS.map((book) => ({
+        address: `0x${book.id}${'0'.repeat(40 - book.id.length)}`,
+        symbol: book.symbol,
+        name: book.title,
+        author: book.author,
+        sales: book.sales,
+        explorerUrl: '#'
+      }));
+      setBookSales(salesData);
+      setTotalSales(getTotalSales());
+    }
   };
 
-  // Mock: 刷新余额
-  const fetchPublisherBalance = async () => {
+  // 刷新余额
+  const fetchPublisherBalanceData = async () => {
+    if (!pubAddress) return;
+    
     setBalanceLoading(true);
-    await mockDelay(500);
-    setBalanceCFX(prev => prev + Math.random() * 10);
-    setBalanceLoading(false);
-    showToast('余额已刷新 (Mock)', 'success');
+    try {
+      const result = await getPublisherBalance(pubAddress);
+      if (result.ok) {
+        setBalanceCFX(parseFloat(result.balance));
+        setMaxDeploys(result.maxDeploys);
+      }
+      showToast('余额已刷新', 'success');
+    } catch (e: any) {
+      console.error('获取余额失败:', e);
+      showToast(e.message || '获取余额失败', 'error');
+      // Mock 模式下模拟数据
+      if (isMockMode) {
+        setBalanceCFX(prev => prev || 125.50);
+        setMaxDeploys(prev => prev || 12);
+      }
+    } finally {
+      setBalanceLoading(false);
+    }
   };
 
-  // Mock: 部署合约
+  // 部署合约
   const handleDeployContract = async () => {
     if (!bookName || !symbol) {
       setError("请完整填写书籍名称和代码");
@@ -112,34 +158,52 @@ const Publisher: React.FC = () => {
     setOpLoading(true);
     setError(null);
 
-    await mockDelay(2000);
-    
-    const txHash = generateFakeTxHash();
-    setContractAddr(txHash);
-    
-    // 添加到列表
-    const newBook: BookSales = {
-      address: txHash,
-      symbol: symbol.toUpperCase(),
-      name: bookName,
-      author: author || '未知作者',
-      sales: 0,
-      explorerUrl: '#'
-    };
-    setBookSales(prev => [newBook, ...prev]);
-    
-    showToast(`合约部署成功！${symbol.toUpperCase()}`, 'success', txHash);
-    setOpLoading(false);
+    try {
+      const result = await deployBook({
+        name: bookName,
+        symbol: symbol.toUpperCase(),
+        author: author || '未知作者',
+        serial: serial || `SERIAL${Date.now()}`,
+        publisher: pubAddress,
+        privKey: privKey, // 生产环境中应该由后端管理
+      });
+
+      if (result.ok) {
+        setContractAddr(result.bookAddr);
+        
+        // 添加到列表
+        const newBook: BookSales = {
+          address: result.bookAddr,
+          symbol: symbol.toUpperCase(),
+          name: bookName,
+          author: author || '未知作者',
+          sales: 0,
+          explorerUrl: isMockMode ? '#' : `https://evm.confluxscan.net/tx/${result.txHash}`
+        };
+        setBookSales(prev => [newBook, ...prev]);
+        
+        showToast(`合约部署成功！${symbol.toUpperCase()}`, 'success', result.txHash);
+      } else {
+        throw new Error(result.error || '部署失败');
+      }
+    } catch (e: any) {
+      console.error('部署合约失败:', e);
+      setError(e.message || '部署失败，请检查参数');
+      showToast(e.message || '部署失败', 'error');
+    } finally {
+      setOpLoading(false);
+    }
   };
 
-  // Mock: 批量生成码
+  // 批量生成码 (目前仍使用 Mock)
   const handleGenerateBatch = async () => {
     if (!contractAddr) return;
     setOpLoading(true);
 
-    await mockDelay(1500);
+    // TODO: 接入后端 API
+    await new Promise(resolve => setTimeout(resolve, 1500));
     
-    showToast(`已生成 ${count} 个激活码 (Mock)`, 'success');
+    showToast(`已生成 ${count} 个激活码`, 'success');
     setOpLoading(false);
   };
 
@@ -148,7 +212,9 @@ const Publisher: React.FC = () => {
       <div className="min-h-screen bg-[#0b0e11] flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-400 text-sm">加载 Mock 数据...</p>
+          <p className="text-slate-400 text-sm">
+            {isMockMode ? '加载 Mock 数据...' : '连接后端 API...'}
+          </p>
         </div>
       </div>
     );
@@ -177,10 +243,12 @@ const Publisher: React.FC = () => {
                 <p className="text-[10px] text-slate-500 uppercase tracking-widest mt-0.5">
                   {pubAddress.slice(0, 6)}...{pubAddress.slice(-4)}
                 </p>
-                <span className="text-[8px] bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded-full uppercase">Demo</span>
+                <span className={`text-[8px] ${isMockMode ? 'bg-cyan-500/20 text-cyan-400' : 'bg-green-500/20 text-green-400'} px-2 py-0.5 rounded-full uppercase`}>
+                  {isMockMode ? 'Demo' : 'Dev API'}
+                </span>
               </div>
             </div>
-            {/* Mock 钱包余额显示 */}
+            {/* 钱包余额显示 */}
             <div className="flex items-center gap-4 px-4 py-2 bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 border border-emerald-500/20 rounded-xl">
               <div className="text-center">
                 <p className="text-[10px] text-emerald-400/70 uppercase tracking-wider">CFX 余额</p>
@@ -196,7 +264,7 @@ const Publisher: React.FC = () => {
                 </p>
               </div>
               <button 
-                onClick={fetchPublisherBalance}
+                onClick={fetchPublisherBalanceData}
                 className="ml-2 p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-all"
                 title="刷新余额"
               >
@@ -241,7 +309,7 @@ const Publisher: React.FC = () => {
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-gradient-to-br from-blue-600/20 to-blue-800/10 border border-blue-500/20 rounded-2xl p-6">
-                <p className="text-blue-400 text-xs uppercase tracking-wider mb-1">总销量 (Mock)</p>
+                <p className="text-blue-400 text-xs uppercase tracking-wider mb-1">总销量</p>
                 <p className="text-4xl font-black text-white">{totalSales.toLocaleString()}</p>
               </div>
               <div className="bg-gradient-to-br from-cyan-600/20 to-cyan-800/10 border border-cyan-500/20 rounded-2xl p-6">
@@ -256,8 +324,10 @@ const Publisher: React.FC = () => {
 
             <div className="bg-[#131722] border border-white/5 rounded-2xl overflow-hidden">
               <div className="px-6 py-4 border-b border-white/5 flex justify-between items-center">
-                <h2 className="text-sm font-bold text-white">📖 图书销量排行 (Mock)</h2>
-                <span className="text-[10px] bg-cyan-500/20 text-cyan-400 px-2 py-1 rounded-full uppercase">Demo Data</span>
+                <h2 className="text-sm font-bold text-white">📖 图书销量排行</h2>
+                <span className={`text-[10px] ${isMockMode ? 'bg-cyan-500/20 text-cyan-400' : 'bg-green-500/20 text-green-400'} px-2 py-1 rounded-full uppercase`}>
+                  {isMockMode ? 'Demo Data' : 'Live Data'}
+                </span>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
@@ -300,7 +370,16 @@ const Publisher: React.FC = () => {
         {activeTab === 'addBook' && (
           <div className="max-w-lg mx-auto">
             <div className="bg-[#131722] border border-white/5 rounded-2xl p-8">
-              <h2 className="text-lg font-bold text-white mb-6">📚 部署新书 NFT 合约 (Mock)</h2>
+              <h2 className="text-lg font-bold text-white mb-6">📚 部署新书 NFT 合约</h2>
+              
+              {/* API 模式提示 */}
+              <div className={`mb-4 p-3 ${isMockMode ? 'bg-cyan-500/10 border-cyan-500/20' : 'bg-green-500/10 border-green-500/20'} border rounded-xl`}>
+                <p className={`text-xs ${isMockMode ? 'text-cyan-400' : 'text-green-400'}`}>
+                  {isMockMode 
+                    ? '🔧 Demo 模式：合约部署仅为模拟' 
+                    : `🟢 Dev API：将调用 ${apiBaseUrl}/api/v1/publisher/deploy-book`}
+                </p>
+              </div>
               
               {error && (
                 <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
@@ -310,7 +389,7 @@ const Publisher: React.FC = () => {
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs text-slate-400 mb-2 uppercase">书籍名称</label>
+                  <label className="block text-xs text-slate-400 mb-2 uppercase">书籍名称 *</label>
                   <input 
                     placeholder="例：区块链技术原理" 
                     className="w-full bg-[#0b0e11] border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-cyan-500 transition-colors"
@@ -328,7 +407,7 @@ const Publisher: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-400 mb-2 uppercase">书籍代码 (Symbol)</label>
+                  <label className="block text-xs text-slate-400 mb-2 uppercase">书籍代码 (Symbol) *</label>
                   <input 
                     placeholder="例：BLOCKCHAIN" 
                     className="w-full bg-[#0b0e11] border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-cyan-500 transition-colors uppercase"
@@ -336,18 +415,41 @@ const Publisher: React.FC = () => {
                     onChange={(e) => setSymbol(e.target.value.toUpperCase())}
                   />
                 </div>
+                <div>
+                  <label className="block text-xs text-slate-400 mb-2 uppercase">序列号 (Serial)</label>
+                  <input 
+                    placeholder="例：SERIAL001" 
+                    className="w-full bg-[#0b0e11] border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-cyan-500 transition-colors"
+                    value={serial} 
+                    onChange={(e) => setSerial(e.target.value)}
+                  />
+                </div>
+                
+                {!isMockMode && (
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-2 uppercase">出版社私钥 (用于签名)</label>
+                    <input 
+                      type="password"
+                      placeholder="0x..." 
+                      className="w-full bg-[#0b0e11] border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-cyan-500 transition-colors font-mono"
+                      value={privKey} 
+                      onChange={(e) => setPrivKey(e.target.value)}
+                    />
+                    <p className="text-[9px] text-yellow-500/70 mt-1">⚠️ 仅用于 Dev 测试，生产环境由后端管理私钥</p>
+                  </div>
+                )}
                 
                 <button
                   onClick={handleDeployContract}
-                  disabled={opLoading}
+                  disabled={opLoading || !bookName || !symbol}
                   className="w-full mt-4 py-4 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl font-bold text-sm uppercase tracking-widest hover:from-purple-500 hover:to-pink-500 disabled:opacity-50 transition-all"
                 >
-                  {opLoading ? '模拟部署中...' : '部署合约 (Mock)'}
+                  {opLoading ? '部署中...' : '部署合约'}
                 </button>
                 
                 {contractAddr && (
                   <div className="mt-4 p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
-                    <p className="text-green-400 text-xs mb-2">✓ 合约部署成功 (Mock)</p>
+                    <p className="text-green-400 text-xs mb-2">✓ 合约部署成功</p>
                     <p className="text-[10px] font-mono text-gray-400 break-all">{contractAddr}</p>
                   </div>
                 )}
@@ -360,7 +462,7 @@ const Publisher: React.FC = () => {
         {activeTab === 'qrcode' && (
           <div className="max-w-lg mx-auto">
             <div className="bg-[#131722] border border-white/5 rounded-2xl p-8">
-              <h2 className="text-lg font-bold text-white mb-6">🔗 批量生成二维码 (Mock)</h2>
+              <h2 className="text-lg font-bold text-white mb-6">🔗 批量生成二维码</h2>
               
               <div className="space-y-4">
                 <div>
@@ -397,7 +499,7 @@ const Publisher: React.FC = () => {
                   disabled={opLoading || !contractAddr}
                   className="w-full mt-4 py-4 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl font-bold text-sm uppercase tracking-widest hover:from-cyan-500 hover:to-blue-500 disabled:opacity-50 transition-all"
                 >
-                  {opLoading ? '生成中...' : `生成 ${count} 个二维码 (Mock)`}
+                  {opLoading ? '生成中...' : `生成 ${count} 个二维码`}
                 </button>
               </div>
             </div>
@@ -408,7 +510,7 @@ const Publisher: React.FC = () => {
         {activeTab === 'analytics' && (
           <div className="space-y-6">
             <div className="bg-[#131722] border border-white/5 rounded-2xl p-6">
-              <h2 className="text-sm font-bold text-white mb-4">🗺️ 地区读者分布 (Mock)</h2>
+              <h2 className="text-sm font-bold text-white mb-4">🗺️ 地区读者分布</h2>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                 {regionRanks.map((region, idx) => (
                   <div key={region.region} className="bg-white/5 rounded-xl p-4 text-center">

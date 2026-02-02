@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { mockDelay } from '../data/mockData';
 import { useAppMode } from '../contexts/AppModeContext';
-import { BACKEND_URL } from '../config/backend';
+import { useApi } from '../hooks/useApi';
 
 interface VerifyPageProps {
   onVerify?: (address: string, codeHash: string) => Promise<'publisher' | 'author' | 'reader' | null>;
@@ -12,9 +11,11 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
   const navigate = useNavigate();
   const { hash } = useParams<{ hash: string }>(); 
   const { isMockMode } = useAppMode();
+  const { verifyCode, getBinding } = useApi();
 
   const [codeHash] = useState(hash || '');
   const [targetAddress, setTargetAddress] = useState('');
+  const [bookAddress, setBookAddress] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [role, setRole] = useState<'publisher' | 'author' | 'reader' | null>(null);
@@ -28,82 +29,67 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
         return;
       }
       
-      if (isMockMode) {
-        // ========== MOCK 模式：模拟验证逻辑 ==========
-        await mockDelay(1000);
+      try {
+        // 1. 验证 codeHash 是否存在
+        const verifyResult = await verifyCode(codeHash);
         
-        const lowerHash = codeHash.toLowerCase();
-        
-        if (lowerHash.startsWith('invalid') || lowerHash.length < 8) {
+        if (!verifyResult.ok) {
           setInvalidCode(true);
+          setError(verifyResult.error || '二维码验证失败');
           setLoading(false);
           return;
         }
         
-        const mockAddress = `0x${codeHash.slice(0, 40).padEnd(40, '0')}`;
-        setTargetAddress(mockAddress);
-        
-        if (lowerHash.startsWith('pub')) {
+        // 2. 设置角色
+        if (verifyResult.role === 'publisher') {
           setRole('publisher');
-        } else if (lowerHash.startsWith('auth')) {
+        } else if (verifyResult.role === 'author') {
           setRole('author');
         } else {
           setRole('reader');
         }
         
-        setLoading(false);
-      } else {
-        // ========== DEV 模式：真实 API 调用 ==========
+        // 3. 获取绑定的地址
         try {
-          // 1. 验证 codeHash 是否存在于 Redis
-          const verifyResp = await fetch(`${BACKEND_URL}/secret/verify?codeHash=${codeHash}`);
-          
-          if (verifyResp.status === 403 || verifyResp.status === 404) {
-            setInvalidCode(true);
-            setLoading(false);
-            return;
-          }
-          
-          if (!verifyResp.ok) {
-            throw new Error(`验证失败: ${verifyResp.status}`);
-          }
-          
-          const verifyData = await verifyResp.json();
-          
-          // 2. 获取绑定的地址
-          const bindResp = await fetch(`${BACKEND_URL}/secret/get-binding?codeHash=${codeHash}`);
-          if (bindResp.ok) {
-            const bindData = await bindResp.json();
-            if (bindData.address) {
-              setTargetAddress(bindData.address);
+          const bindResult = await getBinding(codeHash);
+          if (bindResult.ok) {
+            if (bindResult.address) {
+              setTargetAddress(bindResult.address);
+            }
+            if (bindResult.book_address) {
+              setBookAddress(bindResult.book_address);
             }
           }
-          
-          // 3. 设置角色
-          if (verifyData.role === 'publisher') {
-            setRole('publisher');
-          } else if (verifyData.role === 'author') {
-            setRole('author');
-          } else {
-            setRole('reader');
-          }
-          
-          setLoading(false);
-        } catch (e: any) {
-          console.error('API 验证失败:', e);
-          setError(e.message || '网络异常，请确认后端已启动');
-          setLoading(false);
+        } catch (bindError) {
+          console.warn('获取绑定信息失败:', bindError);
+          // 绑定信息可选，不阻塞流程
         }
+        
+        setLoading(false);
+      } catch (e: any) {
+        console.error('验证失败:', e);
+        
+        // 检查是否是 404/403 错误（无效码）
+        if (e.message?.includes('403') || e.message?.includes('404') || e.message?.includes('not found') || e.message?.includes('Binding not found')) {
+          setInvalidCode(true);
+          setError('该二维码在系统中不存在，请购买正版书籍获取有效的激活码。');
+        } else {
+          setError(e.message || '网络异常，请确认后端已启动');
+        }
+        setLoading(false);
       }
     };
     
     initTerminal();
-  }, [codeHash, isMockMode]);
+  }, [codeHash, verifyCode, getBinding]);
 
   const confirmAndGoToMint = () => {
-    console.log("理智抉择：确认无推荐人或已登记，进入铸造流程。");
-    setShowDecisionModal(false);
-    navigate(`/mint/${codeHash}`);
+    // 将 bookAddress 传递到铸造页面
+    const params = new URLSearchParams();
+    if (bookAddress) params.set('book_address', bookAddress);
+    if (targetAddress) params.set('reader_address', targetAddress);
+    
+    navigate(`/mint/${codeHash}?${params.toString()}`);
   };
 
   // 无效二维码错误页面
@@ -116,14 +102,12 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
           </div>
           <h1 className="text-xl font-bold text-white">无效的二维码</h1>
           <p className="text-sm text-gray-400 leading-relaxed">
-            {isMockMode 
-              ? '该二维码无效或已被使用。请确认您扫描的是正版商品附带的二维码。'
-              : '该二维码在系统中不存在。请购买正版书籍获取有效的激活码。'}
+            {error || '该二维码无效或已被使用。请确认您扫描的是正版商品附带的二维码。'}
           </p>
           {isMockMode && (
             <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-4">
               <p className="text-xs text-yellow-500/80 font-medium">
-                ⚠️ DEMO 模式：使用有效格式的 hash 进行测试
+                ⚠️ DEMO 模式：使用 pub_xxx 或 auth_xxx 格式的 hash 进行测试
               </p>
             </div>
           )}
@@ -143,8 +127,11 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
 
   if (loading && !role) {
     return (
-      <div className="min-h-screen bg-[#0b0e11] flex flex-col items-center justify-center font-mono text-blue-500 text-[10px] tracking-widest uppercase animate-pulse">
-        Establishing Mock Connection...
+      <div className="min-h-screen bg-[#0b0e11] flex flex-col items-center justify-center font-mono text-[10px] tracking-widest uppercase">
+        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className={isMockMode ? 'text-cyan-500 animate-pulse' : 'text-green-500 animate-pulse'}>
+          {isMockMode ? 'Mock 验证中...' : '连接后端 API...'}
+        </p>
       </div>
     );
   }
@@ -193,7 +180,7 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
         {/* 模式标识 */}
         <div className={`${isMockMode ? 'bg-cyan-500/10 border-cyan-500/20' : 'bg-green-500/10 border-green-500/20'} border rounded-lg p-2 text-center`}>
           <p className={`text-[10px] font-bold uppercase tracking-wider ${isMockMode ? 'text-cyan-400' : 'text-green-400'}`}>
-            {isMockMode ? '🔧 Demo Mode - Mock Data' : '🟢 Dev API - Redis 验证'}
+            {isMockMode ? '🔧 Demo Mode - Mock Data' : '🟢 Dev API - 后端验证'}
           </p>
         </div>
 
@@ -219,6 +206,12 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
                 <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">预设确权地址</p>
                 <p className="text-[10px] font-mono text-slate-400 break-all">{targetAddress || '0x...'}</p>
             </div>
+            {bookAddress && (
+              <div className="space-y-1 text-center">
+                <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">书籍合约地址</p>
+                <p className="text-[10px] font-mono text-cyan-400 break-all">{bookAddress}</p>
+              </div>
+            )}
             <button 
               onClick={() => setShowDecisionModal(true)}
               className="w-full py-5 rounded-2xl bg-green-600 font-black text-xs uppercase tracking-widest hover:bg-green-500 active:scale-95 transition-all shadow-lg shadow-green-500/10"
@@ -243,7 +236,9 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
                 placeholder="0x..."
                 readOnly={!!targetAddress}
               />
-              <p className="text-[9px] text-slate-600 text-center">此地址已与您的激活码绑定 (Mock)</p>
+              <p className="text-[9px] text-slate-600 text-center">
+                {isMockMode ? '此地址已与您的激活码绑定 (Mock)' : '此地址已与您的激活码绑定'}
+              </p>
             </div>
             <button 
               onClick={handleAdminLogin}

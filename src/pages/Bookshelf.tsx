@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { useAppMode } from '../contexts/AppModeContext';
+import { useApi } from '../hooks/useApi';
 import { MOCK_BOOKS, MockBook } from '../data/mockData';
 import { ScanVerifyModal } from '../components/ScanVerifyModal';
 import { BettingModal } from '../components/BettingModal';
@@ -18,9 +20,12 @@ const LANGUAGES = [
 export default function Bookshelf() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  const { isMockMode } = useAppMode();
+  const { fetchBooks } = useApi();
   
-  // 使用 Mock 数据
-  const [tickers, setTickers] = useState<MockBook[]>(MOCK_BOOKS);
+  const [tickers, setTickers] = useState<MockBook[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [lastUpdatedIndex, setLastUpdatedIndex] = useState<number | null>(null);
   
   // Modal 状态
@@ -28,8 +33,34 @@ export default function Bookshelf() {
   const [showBettingModal, setShowBettingModal] = useState(false);
   const [selectedBook, setSelectedBook] = useState<MockBook | null>(null);
 
+  // 加载数据
+  useEffect(() => {
+    const loadBooks = async () => {
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const result = await fetchBooks(1);
+        if (result.data) {
+          setTickers(result.data);
+        }
+      } catch (e: any) {
+        console.error('加载书籍失败:', e);
+        setError(e.message || '加载数据失败');
+        // 降级使用 Mock 数据
+        setTickers(MOCK_BOOKS);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadBooks();
+  }, [fetchBooks]);
+
   // 模拟"终焉大盘"实时波动逻辑
   useEffect(() => {
+    if (tickers.length === 0) return;
+    
     const interval = setInterval(() => {
       const randomIndex = Math.floor(Math.random() * tickers.length);
       
@@ -90,6 +121,27 @@ export default function Bookshelf() {
     }
   };
 
+  if (loading) {
+    return (
+      <div style={{ ...styles.container, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ 
+            width: 48, height: 48, 
+            border: '4px solid #833ab4', 
+            borderTopColor: 'transparent', 
+            borderRadius: '50%', 
+            animation: 'spin 1s linear infinite',
+            margin: '0 auto 16px'
+          }} />
+          <p style={{ color: '#666', fontSize: 12 }}>
+            {isMockMode ? '加载 Mock 数据...' : '连接后端 API...'}
+          </p>
+        </div>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
   return (
     <div style={styles.container}>
       <ToastContainer />
@@ -99,9 +151,18 @@ export default function Bookshelf() {
         <div style={styles.tickerContent}>
           <span style={{ color: '#00ffad', fontWeight: 'bold' }}>● {t('market_status') || 'MARKET LIVE'}</span>
           <span style={styles.divider}>|</span>
-          <span>{t('network') || 'DEMO MODE'}</span>
+          <span style={{ color: isMockMode ? '#22d3ee' : '#22c55e' }}>
+            {isMockMode ? 'MOCK MODE' : 'DEV API'}
+          </span>
           <span style={styles.divider}>|</span>
           <span>{t('index') || 'INDEX'}: <span style={{color: '#fff'}}>{(tickers.reduce((acc, curr) => acc + curr.sales, 0) / 10000).toFixed(2)}K</span></span>
+          
+          {error && (
+            <>
+              <span style={styles.divider}>|</span>
+              <span style={{ color: '#ef4444', fontSize: 10 }}>⚠️ {error.slice(0, 30)}</span>
+            </>
+          )}
           
           {/* 扫码按钮 */}
           <button
@@ -139,8 +200,13 @@ export default function Bookshelf() {
               <span style={styles.terminalText}>TERMINAL</span>
             </h1>
             <p style={styles.subtitle}>{t('subtitle') || 'Real-time Book Sales & Prediction Market'}</p>
-            <div style={styles.demoBadge}>
-              🔧 DEMO MODE - No Backend Required
+            <div style={{
+              ...styles.demoBadge,
+              backgroundColor: isMockMode ? 'rgba(34, 211, 238, 0.1)' : 'rgba(34, 197, 94, 0.1)',
+              borderColor: isMockMode ? 'rgba(34, 211, 238, 0.3)' : 'rgba(34, 197, 94, 0.3)',
+              color: isMockMode ? '#22d3ee' : '#22c55e',
+            }}>
+              {isMockMode ? '🔧 DEMO MODE - No Backend Required' : '🟢 DEV API - Connected to Backend'}
             </div>
           </div>
         </header>
@@ -311,11 +377,9 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'inline-block',
     marginTop: '10px',
     padding: '6px 12px',
-    backgroundColor: 'rgba(34, 211, 238, 0.1)',
-    border: '1px solid rgba(34, 211, 238, 0.3)',
+    border: '1px solid',
     borderRadius: '6px',
     fontSize: '10px',
-    color: '#22d3ee',
     fontWeight: 'bold',
     letterSpacing: '1px'
   },
