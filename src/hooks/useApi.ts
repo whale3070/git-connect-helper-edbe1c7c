@@ -170,7 +170,15 @@ export const useApi = () => {
    * Response: { ok: true, address: '0x...' }
    */
   const getBinding = useCallback(async (codeHash: string) => {
-    return apiFetch<{ ok: boolean; address?: string; book_address?: string }>(
+    return apiFetch<{ 
+      ok: boolean; 
+      address?: string; 
+      book_address?: string;
+      role?: string;
+      status?: string;
+      message?: string;
+      error?: string;
+    }>(
       `/secret/get-binding?codeHash=${encodeURIComponent(codeHash)}`,
       { method: 'GET' },
       async () => {
@@ -179,6 +187,9 @@ export const useApi = () => {
           ok: true,
           address: `0x${codeHash.slice(0, 40).padEnd(40, '0')}`,
           book_address: '0xe250ae653190F2EDF3ac79FD9bdF2687A90CDE84',
+          role: 'reader',
+          status: 'valid',
+          message: '读者激活码有效',
         };
       }
     );

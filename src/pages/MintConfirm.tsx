@@ -62,17 +62,33 @@ export default function MintConfirm() {
         let bookAddress = bookAddressParam;
         let readerAddress = readerAddressParam;
 
-        if (!bookAddress || !readerAddress) {
-          setMintStatus('获取绑定信息...');
-          try {
-            const bindResult = await getBinding(code);
-            if (bindResult.ok) {
-              bookAddress = bindResult.book_address || bookAddress;
-              readerAddress = bindResult.address || readerAddress;
-            }
-          } catch (e) {
-            console.warn('获取绑定信息失败，使用默认值');
+        // 第一步：获取绑定信息并验证
+        setMintStatus('验证读者身份...');
+        try {
+          const bindResult = await getBinding(code);
+          console.log('[MintConfirm] 绑定信息返回:', bindResult);
+          
+          if (!bindResult.ok) {
+            throw new Error(bindResult.error || '验证失败');
           }
+          
+          // 检查是否为有效读者
+          if (bindResult.status !== 'valid' && bindResult.status !== 'used') {
+            throw new Error('无效的激活码状态');
+          }
+          
+          // 提取地址信息
+          bookAddress = bindResult.book_address || bookAddress;
+          readerAddress = bindResult.address || readerAddress;
+          
+          console.log('[MintConfirm] 验证成功 - 书籍地址:', bookAddress, '读者地址:', readerAddress);
+        } catch (e: any) {
+          console.error('[MintConfirm] 获取绑定信息失败:', e);
+          if (!isMockMode) {
+            setError(e.message || 'BINDING_FAILED');
+            return;
+          }
+          console.warn('Mock 模式：使用默认值');
         }
 
         if (!bookAddress) {
