@@ -249,11 +249,16 @@ func (h *AuthHandler) GetBinding(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	role := h.determineRole(ctx, codeHash)
+	
+	// 从环境变量获取书籍合约地址
+	bookAddress := os.Getenv("CONTRACT_ADDR")
+	
 	response := map[string]interface{}{
-		"ok":         true,
-		"address":    bindData["address"],
-		"privateKey": bindData["privateKey"],
-		"role":       role,
+		"ok":           true,
+		"address":      bindData["address"],
+		"privateKey":   bindData["privateKey"],
+		"role":         role,
+		"book_address": bookAddress,
 	}
 	
 	// 添加额外信息
