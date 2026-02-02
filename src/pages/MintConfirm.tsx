@@ -110,28 +110,42 @@ export default function MintConfirm() {
         }
 
         setMintStatus('正在链上铸造 NFT...');
-        const mintResult = await mintNFT(bookAddress, readerAddress);
-
-        if (!mintResult.ok || !mintResult.data?.tx_hash) {
-          throw new Error((mintResult as any).error || '铸造请求失败');
+        
+        let txHash = '';
+        try {
+          const mintResult = await mintNFT(bookAddress, readerAddress);
+          if (mintResult.ok && mintResult.data?.tx_hash) {
+            txHash = mintResult.data.tx_hash;
+          }
+        } catch (mintError: any) {
+          console.warn('[MintConfirm] 铸造请求出错，但仍跳转到 Success 页面:', mintError);
+          // 即使出错也继续跳转，用户可以在 Success 页面刷新状态
         }
 
-        const txHash = mintResult.data.tx_hash;
-        setMintStatus(`交易已发送，正在跳转...`);
+        setMintStatus(`正在跳转...`);
 
-        // 立即跳转到Success页面，不再等待轮询
+        // 无论成功失败都跳转到 Success 页面
         const query = new URLSearchParams({
           book_id: bookIdRaw,
           address: readerAddress,
-          txHash: txHash,
           codeHash: code,
-          status: 'pending', // 标记为待确认状态
+          status: txHash ? 'pending' : 'unknown',
         });
+        
+        if (txHash) {
+          query.set('txHash', txHash);
+        }
 
         navigate(`/success?${query.toString()}`, { replace: true });
       } catch (e: any) {
-        console.error("Mint failed:", e);
-        setError(e.message || 'MINT_FAILED');
+        console.error("Mint flow error:", e);
+        // 即使有错误也跳转到 Success 页面
+        const query = new URLSearchParams({
+          book_id: bookIdRaw,
+          codeHash: code,
+          status: 'unknown',
+        });
+        navigate(`/success?${query.toString()}`, { replace: true });
       }
     };
 
