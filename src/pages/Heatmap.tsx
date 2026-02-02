@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as echarts from 'echarts';
-import { MOCK_REGIONS, mockDelay } from '../data/mockData';
+import { useAppMode } from '../contexts/AppModeContext';
+import { useApi } from '../hooks/useApi';
+import { MOCK_REGIONS } from '../data/mockData';
 import { RefreshCw } from 'lucide-react';
 
 const POLL_INTERVAL = 5000; // 5秒更新一次
@@ -8,32 +10,42 @@ const POLL_INTERVAL = 5000; // 5秒更新一次
 const Heatmap: React.FC = () => {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstance = useRef<echarts.ECharts | null>(null);
+  const { isMockMode, apiBaseUrl } = useAppMode();
+  const { fetchHeatmapData: fetchHeatmapApi } = useApi();
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [totalReaders, setTotalReaders] = useState<number>(0);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
-  // Mock: 获取热力图数据
+  // 获取热力图数据 - 统一使用 useApi
   const fetchHeatmapData = useCallback(async () => {
-    await mockDelay(300);
-    
-    // 动态更新 Mock 数据（模拟新读者加入）
-    const dynamicData = MOCK_REGIONS.map(region => ({
-      ...region,
-      value: [
-        region.value[0],
-        region.value[1],
-        region.value[2] + Math.floor(Math.random() * 3) // 随机增加0-2人
-      ] as [number, number, number]
-    }));
-    
-    // 计算总读者数
-    const total = dynamicData.reduce((sum, item) => sum + item.value[2], 0);
-    setTotalReaders(total);
-    setLastUpdate(new Date());
-    
-    return dynamicData;
-  }, []);
+    try {
+      const result = await fetchHeatmapApi();
+      
+      if (result.ok && result.regions) {
+        // 动态更新数据（模拟新读者加入）
+        const dynamicData = result.regions.map(region => ({
+          ...region,
+          value: [
+            region.value[0],
+            region.value[1],
+            region.value[2] + Math.floor(Math.random() * 3)
+          ] as [number, number, number]
+        }));
+        
+        const total = dynamicData.reduce((sum, item) => sum + item.value[2], 0);
+        setTotalReaders(total);
+        setLastUpdate(new Date());
+        
+        return dynamicData;
+      }
+    } catch (e: any) {
+      console.error('获取热力图数据失败:', e);
+      // 降级使用 Mock
+      return MOCK_REGIONS;
+    }
+    return MOCK_REGIONS;
+  }, [fetchHeatmapApi]);
 
   // 更新图表数据
   const updateChartData = useCallback(async () => {
@@ -70,7 +82,7 @@ const Heatmap: React.FC = () => {
         const option: echarts.EChartsOption = {
           backgroundColor: '#0f172a',
           title: {
-            text: '🐋 WHALE VAULT - 全球读者回响分布 (DEMO)',
+            text: `🐋 WHALE VAULT - 全球读者回响分布 (${isMockMode ? 'DEMO' : 'DEV API'})`,
             left: 'center',
             top: '40',
             textStyle: {
