@@ -117,21 +117,18 @@ export default function MintConfirm() {
         }
 
         const txHash = mintResult.data.tx_hash;
-        setMintStatus(`交易已发送: ${txHash.slice(0, 10)}...`);
+        setMintStatus(`交易已发送，正在跳转...`);
 
-        const confirmResult = await pollTransactionStatus(txHash);
+        // 立即跳转到Success页面，不再等待轮询
+        const query = new URLSearchParams({
+          book_id: bookIdRaw,
+          address: readerAddress,
+          txHash: txHash,
+          codeHash: code,
+          status: 'pending', // 标记为待确认状态
+        });
 
-        if (confirmResult.success) {
-          const query = new URLSearchParams({
-            book_id: bookIdRaw,
-            address: confirmResult.reader,
-            txHash: txHash,
-            codeHash: code,
-            token_id: confirmResult.tokenId,
-          });
-
-          navigate(`/success?${query.toString()}`, { replace: true });
-        }
+        navigate(`/success?${query.toString()}`, { replace: true });
       } catch (e: any) {
         console.error("Mint failed:", e);
         setError(e.message || 'MINT_FAILED');
