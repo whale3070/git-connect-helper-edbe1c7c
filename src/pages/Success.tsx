@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { CheckCircle, ShieldCheck, ExternalLink, Loader2, Users, LineChart, MapPin, Globe, RefreshCw, Clock, AlertCircle } from 'lucide-react';
+import { CheckCircle, ShieldCheck, ExternalLink, Loader2, Users, LineChart, MapPin, Globe, RefreshCw, Clock, AlertCircle, MessageCircle } from 'lucide-react';
 import { useAppMode } from '../contexts/AppModeContext';
 import { mockDelay, MOCK_REGIONS, getRandomBook } from '../data/mockData';
 import { useApi } from '../hooks/useApi';
@@ -286,6 +286,19 @@ const Success = () => {
               <p className="text-xs text-slate-500">邀请好友激活，赚取节点分成收益</p>
             </div>
           </button>
+
+          <a 
+            href="https://matrix.to/#/!jOcJpAxdUNYvaMZuqJ:matrix.org" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center gap-4 bg-gradient-to-r from-pink-50 to-rose-50 border border-pink-200 p-4 rounded-2xl hover:from-pink-100 hover:to-rose-100 transition-all group text-left"
+          >
+            <div className="bg-pink-100 p-3 rounded-xl"><MessageCircle className="w-5 h-5 text-pink-600" /></div>
+            <div>
+              <h4 className="text-sm font-bold text-slate-800">加入读者俱乐部</h4>
+              <p className="text-xs text-pink-600">和作者、其他读者一起在线分享读书感想</p>
+            </div>
+          </a>
 
           <button onClick={() => navigate('/bookshelf')} className="flex items-center gap-4 bg-gradient-to-r from-indigo-500 to-purple-500 p-4 rounded-2xl hover:from-indigo-600 hover:to-purple-600 transition-all group text-left shadow-md">
             <div className="bg-white/20 p-3 rounded-xl"><LineChart className="w-5 h-5 text-white" /></div>
