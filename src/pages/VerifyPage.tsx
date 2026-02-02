@@ -117,12 +117,6 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
               </p>
             </div>
           )}
-          <button 
-            onClick={() => navigate('/bookshelf')}
-            className="w-full py-4 rounded-xl bg-slate-100 text-slate-700 font-bold text-sm uppercase tracking-widest hover:bg-slate-200 transition-all"
-          >
-            返回大盘
-          </button>
         </div>
         <div className="mt-10 text-xs text-slate-400 uppercase tracking-widest font-medium">
           Whale Vault Protocol <span className="mx-2">•</span> {isMockMode ? 'DEMO MODE' : 'DEV API'}
