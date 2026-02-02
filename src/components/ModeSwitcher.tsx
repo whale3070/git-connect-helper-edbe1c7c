@@ -12,12 +12,11 @@ const ModeSwitcher: React.FC = () => {
         fixed bottom-20 right-4 z-50
         flex items-center gap-2 px-3 py-2 rounded-lg
         text-xs font-mono uppercase tracking-wider
-        border transition-all duration-300
+        border transition-all duration-300 shadow-md
         ${isMockMode 
-          ? 'bg-amber-500/20 border-amber-500/50 text-amber-400 hover:bg-amber-500/30' 
-          : 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/30'
+          ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100' 
+          : 'bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100'
         }
-        shadow-lg backdrop-blur-sm
       `}
       title={isMockMode ? '切换到开发者模式 (真实API)' : '切换到 Mock 模式'}
     >
