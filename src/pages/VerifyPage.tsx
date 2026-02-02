@@ -32,9 +32,10 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
       try {
         const verifyResult = await verifyCode(codeHash);
         
-        if (!verifyResult.ok) {
+        // 检查后端返回的 ok 字段或 error 字段
+        if (!verifyResult.ok || verifyResult.error) {
           setInvalidCode(true);
-          setError(verifyResult.error || '二维码验证失败');
+          setError(verifyResult.error || '无效的二维码，请购买正版商品');
           setLoading(false);
           return;
         }
@@ -53,19 +54,36 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
             if (bindResult.address) setTargetAddress(bindResult.address);
             if (bindResult.book_address) setBookAddress(bindResult.book_address);
           }
-        } catch (bindError) {
+        } catch (bindError: any) {
+          // 绑定信息获取失败也表明是无效二维码
           console.warn('获取绑定信息失败:', bindError);
+          if (bindError.message?.includes('not found') || bindError.message?.includes('Binding not found')) {
+            setInvalidCode(true);
+            setError('无效的二维码，请购买正版商品');
+            setLoading(false);
+            return;
+          }
         }
         
         setLoading(false);
       } catch (e: any) {
         console.error('验证失败:', e);
+        const errMsg = e.message || '';
         
-        if (e.message?.includes('403') || e.message?.includes('404') || e.message?.includes('not found') || e.message?.includes('Binding not found')) {
+        // 任何后端返回的错误都视为无效二维码
+        if (
+          errMsg.includes('403') || 
+          errMsg.includes('404') || 
+          errMsg.includes('not found') || 
+          errMsg.includes('Binding not found') ||
+          errMsg.includes('invalid') ||
+          errMsg.includes('不存在')
+        ) {
           setInvalidCode(true);
-          setError('该二维码在系统中不存在，请购买正版书籍获取有效的激活码。');
+          setError('无效的二维码，请购买正版商品');
         } else {
-          setError(e.message || '网络异常，请确认后端已启动');
+          setInvalidCode(true);
+          setError('无效的二维码，请购买正版商品');
         }
         setLoading(false);
       }
