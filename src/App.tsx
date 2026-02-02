@@ -10,8 +10,11 @@ import Heatmap from './pages/Heatmap';
 import Bookshelf from './pages/Bookshelf'; 
 import BookDetail from './pages/BookDetail'; 
 import VerifyPage from './pages/VerifyPage'; 
-// 关键：必须导入 MintConfirm 组件
-import MintConfirm from './pages/MintConfirm'; 
+import MintConfirm from './pages/MintConfirm';
+
+// 模式切换
+import { AppModeProvider } from './contexts/AppModeContext';
+import ModeSwitcher from './components/ModeSwitcher';
 
 export default function App() {
   
@@ -41,8 +44,11 @@ export default function App() {
   };
 
   return (
-    <BrowserRouter>
-      <div className="min-h-screen bg-[#0b0e11] flex flex-col text-[#d1d4dc]"> 
+    <AppModeProvider>
+      <BrowserRouter>
+        <div className="min-h-screen bg-[#0b0e11] flex flex-col text-[#d1d4dc]">
+          {/* 模式切换按钮 - 固定在右下角 */}
+          <ModeSwitcher />
         
         <main style={{ minHeight: '80vh', position: 'relative', flexGrow: 1 }}>
           <Routes>
@@ -97,8 +103,9 @@ export default function App() {
               Whale Vault Protocol • Terminal v1.1.2 • Monad Hackathon 2026
             </div>
           </div>
-        </footer>
-      </div>
-    </BrowserRouter>
+          </footer>
+        </div>
+      </BrowserRouter>
+    </AppModeProvider>
   );
 }
