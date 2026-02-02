@@ -2,10 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppMode } from '../contexts/AppModeContext';
 import { useApi } from '../hooks/useApi';
-import { MOCK_BOOKS, MOCK_REGIONS, generateFakeTxHash, getTotalSales } from '../data/mockData';
+import { MOCK_BOOKS, MOCK_REGIONS, getTotalSales } from '../data/mockData';
 import { showToast, ToastContainer } from '../components/ui/CyberpunkToast';
 
-// 书籍销量数据结构
 interface BookSales {
   address: string;
   symbol: string;
@@ -15,7 +14,6 @@ interface BookSales {
   explorerUrl: string;
 }
 
-// 地区排名数据结构
 interface RegionRank {
   region: string;
   count: number;
@@ -31,7 +29,6 @@ const Publisher: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'addBook' | 'qrcode' | 'analytics'>('overview');
   
-  // 书籍状态
   const [bookName, setBookName] = useState<string>('');
   const [author, setAuthor] = useState<string>('');
   const [symbol, setSymbol] = useState<string>('');
@@ -40,15 +37,11 @@ const Publisher: React.FC = () => {
   const [contractAddr, setContractAddr] = useState<string | null>(null);
   const [count, setCount] = useState<number>(100);
   
-  // 出版社地址
   const [pubAddress, setPubAddress] = useState<string>('');
-  
-  // 钱包余额
   const [balanceCFX, setBalanceCFX] = useState<number>(0);
   const [maxDeploys, setMaxDeploys] = useState<number>(0);
   const [balanceLoading, setBalanceLoading] = useState<boolean>(false);
 
-  // 销量数据
   const [bookSales, setBookSales] = useState<BookSales[]>([]);
   const [regionRanks, setRegionRanks] = useState<RegionRank[]>([]);
   const [totalSales, setTotalSales] = useState<number>(0);
@@ -59,7 +52,6 @@ const Publisher: React.FC = () => {
       const authRole = localStorage.getItem('vault_user_role');
 
       if (!authAddr || (authRole !== 'publisher' && authRole !== 'author')) {
-        // Demo 模式：自动生成模拟地址
         const mockAddr = `0x${Math.random().toString(16).slice(2, 42)}`;
         setPubAddress(mockAddr);
         localStorage.setItem('vault_pub_auth', mockAddr);
@@ -75,10 +67,8 @@ const Publisher: React.FC = () => {
     initPublisher();
   }, []);
 
-  // 获取仪表盘数据
   const fetchDashboardData = async () => {
     try {
-      // 生成销量列表 (目前后端无专用接口，使用 Mock)
       const salesData: BookSales[] = MOCK_BOOKS.map((book) => ({
         address: `0x${book.id}${'0'.repeat(40 - book.id.length)}`,
         symbol: book.symbol,
@@ -91,7 +81,6 @@ const Publisher: React.FC = () => {
       setBookSales(salesData);
       setTotalSales(getTotalSales());
       
-      // 获取热力图数据
       const heatmapResult = await fetchHeatmapData();
       if (heatmapResult.ok && heatmapResult.regions) {
         const ranked: RegionRank[] = heatmapResult.regions
@@ -100,7 +89,6 @@ const Publisher: React.FC = () => {
           .slice(0, 10);
         setRegionRanks(ranked);
       } else {
-        // 降级使用 Mock
         const ranked: RegionRank[] = MOCK_REGIONS
           .map(r => ({ region: r.name, count: r.value[2] }))
           .sort((a, b) => b.count - a.count)
@@ -109,7 +97,6 @@ const Publisher: React.FC = () => {
       }
     } catch (e: any) {
       console.error('获取仪表盘数据失败:', e);
-      // 降级使用 Mock 数据
       const salesData: BookSales[] = MOCK_BOOKS.map((book) => ({
         address: `0x${book.id}${'0'.repeat(40 - book.id.length)}`,
         symbol: book.symbol,
@@ -123,10 +110,8 @@ const Publisher: React.FC = () => {
     }
   };
 
-  // 刷新余额
   const fetchPublisherBalanceData = async () => {
     if (!pubAddress) return;
-    
     setBalanceLoading(true);
     try {
       const result = await getPublisherBalance(pubAddress);
@@ -138,7 +123,6 @@ const Publisher: React.FC = () => {
     } catch (e: any) {
       console.error('获取余额失败:', e);
       showToast(e.message || '获取余额失败', 'error');
-      // Mock 模式下模拟数据
       if (isMockMode) {
         setBalanceCFX(prev => prev || 125.50);
         setMaxDeploys(prev => prev || 12);
@@ -148,7 +132,6 @@ const Publisher: React.FC = () => {
     }
   };
 
-  // 部署合约
   const handleDeployContract = async () => {
     if (!bookName || !symbol) {
       setError("请完整填写书籍名称和代码");
@@ -165,13 +148,12 @@ const Publisher: React.FC = () => {
         author: author || '未知作者',
         serial: serial || `SERIAL${Date.now()}`,
         publisher: pubAddress,
-        privKey: privKey, // 生产环境中应该由后端管理
+        privKey: privKey,
       });
 
       if (result.ok) {
         setContractAddr(result.bookAddr);
         
-        // 添加到列表
         const newBook: BookSales = {
           address: result.bookAddr,
           symbol: symbol.toUpperCase(),
@@ -195,24 +177,20 @@ const Publisher: React.FC = () => {
     }
   };
 
-  // 批量生成码 (目前仍使用 Mock)
   const handleGenerateBatch = async () => {
     if (!contractAddr) return;
     setOpLoading(true);
-
-    // TODO: 接入后端 API
     await new Promise(resolve => setTimeout(resolve, 1500));
-    
     showToast(`已生成 ${count} 个激活码`, 'success');
     setOpLoading(false);
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0b0e11] flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-slate-400 text-sm">
+          <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-500 text-sm">
             {isMockMode ? '加载 Mock 数据...' : '连接后端 API...'}
           </p>
         </div>
@@ -228,45 +206,43 @@ const Publisher: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0b0e11] text-white">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       <ToastContainer />
       
-      {/* 顶部导航栏 */}
-      <header className="bg-[#131722] border-b border-white/5 px-6 py-4">
+      <header className="bg-white/80 backdrop-blur-lg border-b border-slate-200 sticky top-0 z-10 px-6 py-4">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-6">
             <div>
-              <h1 className="text-xl font-black bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
+              <h1 className="text-xl font-black bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
                 PUBLISHER TERMINAL
               </h1>
               <div className="flex items-center gap-2">
-                <p className="text-[10px] text-slate-500 uppercase tracking-widest mt-0.5">
+                <p className="text-xs text-slate-400 font-mono">
                   {pubAddress.slice(0, 6)}...{pubAddress.slice(-4)}
                 </p>
-                <span className={`text-[8px] ${isMockMode ? 'bg-cyan-500/20 text-cyan-400' : 'bg-green-500/20 text-green-400'} px-2 py-0.5 rounded-full uppercase`}>
+                <span className={`text-[10px] ${isMockMode ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'} px-2 py-0.5 rounded-full font-medium`}>
                   {isMockMode ? 'Demo' : 'Dev API'}
                 </span>
               </div>
             </div>
-            {/* 钱包余额显示 */}
-            <div className="flex items-center gap-4 px-4 py-2 bg-gradient-to-r from-emerald-500/10 to-cyan-500/10 border border-emerald-500/20 rounded-xl">
+            
+            <div className="flex items-center gap-4 px-4 py-2 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-xl">
               <div className="text-center">
-                <p className="text-[10px] text-emerald-400/70 uppercase tracking-wider">CFX 余额</p>
-                <p className="text-lg font-bold text-emerald-400">
+                <p className="text-[10px] text-emerald-600 uppercase font-medium">CFX 余额</p>
+                <p className="text-lg font-bold text-emerald-700">
                   {balanceLoading ? '...' : balanceCFX.toFixed(2)}
                 </p>
               </div>
-              <div className="w-px h-8 bg-white/10"></div>
+              <div className="w-px h-8 bg-emerald-200"></div>
               <div className="text-center">
-                <p className="text-[10px] text-cyan-400/70 uppercase tracking-wider">可部署次数</p>
-                <p className="text-lg font-bold text-cyan-400">
+                <p className="text-[10px] text-teal-600 uppercase font-medium">可部署次数</p>
+                <p className="text-lg font-bold text-teal-700">
                   {balanceLoading ? '...' : maxDeploys}
                 </p>
               </div>
               <button 
                 onClick={fetchPublisherBalanceData}
-                className="ml-2 p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-all"
-                title="刷新余额"
+                className="ml-2 p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -274,16 +250,17 @@ const Publisher: React.FC = () => {
               </button>
             </div>
           </div>
+          
           <div className="flex items-center gap-4">
-            <div className="flex gap-2">
+            <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
               {(['overview', 'addBook', 'qrcode', 'analytics'] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`px-4 py-2 text-xs font-medium rounded-lg transition-all ${
+                  className={`px-3 py-2 text-xs font-medium rounded-md transition-all ${
                     activeTab === tab 
-                      ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' 
-                      : 'text-slate-400 hover:text-white hover:bg-white/5'
+                      ? 'bg-white text-indigo-600 shadow-sm' 
+                      : 'text-slate-500 hover:text-slate-700'
                   }`}
                 >
                   {tab === 'overview' && '📊 销量总览'}
@@ -295,7 +272,7 @@ const Publisher: React.FC = () => {
             </div>
             <button
               onClick={handleLogout}
-              className="px-4 py-2 text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all"
+              className="px-4 py-2 text-xs font-medium text-red-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
             >
               退出登录
             </button>
@@ -304,153 +281,123 @@ const Publisher: React.FC = () => {
       </header>
 
       <main className="max-w-7xl mx-auto p-6">
-        {/* === 销量总览 Tab === */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-gradient-to-br from-blue-600/20 to-blue-800/10 border border-blue-500/20 rounded-2xl p-6">
-                <p className="text-blue-400 text-xs uppercase tracking-wider mb-1">总销量</p>
-                <p className="text-4xl font-black text-white">{totalSales.toLocaleString()}</p>
+              <div className="bg-white rounded-2xl p-6 shadow-soft border border-slate-100">
+                <p className="text-indigo-600 text-xs uppercase font-semibold mb-1">总销量</p>
+                <p className="text-4xl font-black text-slate-800">{totalSales.toLocaleString()}</p>
               </div>
-              <div className="bg-gradient-to-br from-cyan-600/20 to-cyan-800/10 border border-cyan-500/20 rounded-2xl p-6">
-                <p className="text-cyan-400 text-xs uppercase tracking-wider mb-1">上架图书数</p>
-                <p className="text-4xl font-black text-white">{bookSales.length}</p>
+              <div className="bg-white rounded-2xl p-6 shadow-soft border border-slate-100">
+                <p className="text-teal-600 text-xs uppercase font-semibold mb-1">上架图书数</p>
+                <p className="text-4xl font-black text-slate-800">{bookSales.length}</p>
               </div>
-              <div className="bg-gradient-to-br from-purple-600/20 to-purple-800/10 border border-purple-500/20 rounded-2xl p-6">
-                <p className="text-purple-400 text-xs uppercase tracking-wider mb-1">覆盖地区</p>
-                <p className="text-4xl font-black text-white">{regionRanks.length}</p>
+              <div className="bg-white rounded-2xl p-6 shadow-soft border border-slate-100">
+                <p className="text-purple-600 text-xs uppercase font-semibold mb-1">覆盖地区</p>
+                <p className="text-4xl font-black text-slate-800">{regionRanks.length}</p>
               </div>
             </div>
 
-            <div className="bg-[#131722] border border-white/5 rounded-2xl overflow-hidden">
-              <div className="px-6 py-4 border-b border-white/5 flex justify-between items-center">
-                <h2 className="text-sm font-bold text-white">📖 图书销量排行</h2>
-                <span className={`text-[10px] ${isMockMode ? 'bg-cyan-500/20 text-cyan-400' : 'bg-green-500/20 text-green-400'} px-2 py-1 rounded-full uppercase`}>
+            <div className="bg-white rounded-2xl shadow-soft border border-slate-100 overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+                <h2 className="text-sm font-bold text-slate-800">📖 图书销量排行</h2>
+                <span className={`text-xs ${isMockMode ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'} px-2 py-1 rounded-full font-medium`}>
                   {isMockMode ? 'Demo Data' : 'Live Data'}
                 </span>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-white/5">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase">排名</th>
-                      <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase">代码</th>
-                      <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase">书名</th>
-                      <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase">作者</th>
-                      <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-400 uppercase">销量</th>
+              <table className="w-full">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">排名</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">代码</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">书名</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">作者</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 uppercase">销量</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {bookSales.map((book, idx) => (
+                    <tr key={book.address} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-4">
+                        <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
+                          idx === 0 ? 'bg-amber-100 text-amber-700' :
+                          idx === 1 ? 'bg-slate-200 text-slate-600' :
+                          idx === 2 ? 'bg-orange-100 text-orange-700' :
+                          'bg-slate-100 text-slate-500'
+                        }`}>
+                          {idx + 1}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 font-mono text-indigo-600 text-sm font-medium">{book.symbol}</td>
+                      <td className="px-4 py-4 text-slate-800 font-medium">{book.name}</td>
+                      <td className="px-4 py-4 text-slate-500">{book.author}</td>
+                      <td className="px-4 py-4 text-right font-mono text-lg text-emerald-600 font-bold">{book.sales.toLocaleString()}</td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {bookSales.map((book, idx) => (
-                      <tr key={book.address} className="hover:bg-white/5 transition-colors">
-                        <td className="px-4 py-4">
-                          <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
-                            idx === 0 ? 'bg-yellow-500/20 text-yellow-400' :
-                            idx === 1 ? 'bg-slate-400/20 text-slate-300' :
-                            idx === 2 ? 'bg-orange-500/20 text-orange-400' :
-                            'bg-white/5 text-slate-500'
-                          }`}>
-                            {idx + 1}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4 font-mono text-cyan-400 text-sm">{book.symbol}</td>
-                        <td className="px-4 py-4 text-white text-sm">{book.name}</td>
-                        <td className="px-4 py-4 text-slate-400 text-sm">{book.author}</td>
-                        <td className="px-4 py-4 text-right font-mono text-lg text-green-400">{book.sales.toLocaleString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
 
-        {/* === 新增图书 Tab === */}
         {activeTab === 'addBook' && (
           <div className="max-w-lg mx-auto">
-            <div className="bg-[#131722] border border-white/5 rounded-2xl p-8">
-              <h2 className="text-lg font-bold text-white mb-6">📚 部署新书 NFT 合约</h2>
+            <div className="bg-white rounded-2xl shadow-soft border border-slate-100 p-8">
+              <h2 className="text-lg font-bold text-slate-800 mb-6">📚 部署新书 NFT 合约</h2>
               
-              {/* API 模式提示 */}
-              <div className={`mb-4 p-3 ${isMockMode ? 'bg-cyan-500/10 border-cyan-500/20' : 'bg-green-500/10 border-green-500/20'} border rounded-xl`}>
-                <p className={`text-xs ${isMockMode ? 'text-cyan-400' : 'text-green-400'}`}>
-                  {isMockMode 
-                    ? '🔧 Demo 模式：合约部署仅为模拟' 
-                    : `🟢 Dev API：将调用 ${apiBaseUrl}/api/v1/publisher/deploy-book`}
+              <div className={`mb-4 p-3 ${isMockMode ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'} border rounded-xl`}>
+                <p className={`text-xs ${isMockMode ? 'text-amber-700' : 'text-emerald-700'}`}>
+                  {isMockMode ? '🔧 Demo 模式：合约部署仅为模拟' : `🟢 Dev API：${apiBaseUrl}`}
                 </p>
               </div>
               
               {error && (
-                <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
-                  <p className="text-red-400 text-xs">{error}</p>
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl">
+                  <p className="text-red-600 text-xs">{error}</p>
                 </div>
               )}
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs text-slate-400 mb-2 uppercase">书籍名称 *</label>
+                  <label className="block text-xs text-slate-500 mb-2 uppercase font-semibold">书籍名称 *</label>
                   <input 
                     placeholder="例：区块链技术原理" 
-                    className="w-full bg-[#0b0e11] border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-cyan-500 transition-colors"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all"
                     value={bookName} 
                     onChange={(e) => setBookName(e.target.value)}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-400 mb-2 uppercase">作者名称</label>
+                  <label className="block text-xs text-slate-500 mb-2 uppercase font-semibold">作者名称</label>
                   <input 
                     placeholder="例：张三" 
-                    className="w-full bg-[#0b0e11] border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-cyan-500 transition-colors"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all"
                     value={author} 
                     onChange={(e) => setAuthor(e.target.value)}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-400 mb-2 uppercase">书籍代码 (Symbol) *</label>
+                  <label className="block text-xs text-slate-500 mb-2 uppercase font-semibold">书籍代码 (Symbol) *</label>
                   <input 
                     placeholder="例：BLOCKCHAIN" 
-                    className="w-full bg-[#0b0e11] border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-cyan-500 transition-colors uppercase"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all uppercase"
                     value={symbol} 
                     onChange={(e) => setSymbol(e.target.value.toUpperCase())}
                   />
                 </div>
-                <div>
-                  <label className="block text-xs text-slate-400 mb-2 uppercase">序列号 (Serial)</label>
-                  <input 
-                    placeholder="例：SERIAL001" 
-                    className="w-full bg-[#0b0e11] border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-cyan-500 transition-colors"
-                    value={serial} 
-                    onChange={(e) => setSerial(e.target.value)}
-                  />
-                </div>
-                
-                {!isMockMode && (
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-2 uppercase">出版社私钥 (用于签名)</label>
-                    <input 
-                      type="password"
-                      placeholder="0x..." 
-                      className="w-full bg-[#0b0e11] border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-cyan-500 transition-colors font-mono"
-                      value={privKey} 
-                      onChange={(e) => setPrivKey(e.target.value)}
-                    />
-                    <p className="text-[9px] text-yellow-500/70 mt-1">⚠️ 仅用于 Dev 测试，生产环境由后端管理私钥</p>
-                  </div>
-                )}
                 
                 <button
                   onClick={handleDeployContract}
                   disabled={opLoading || !bookName || !symbol}
-                  className="w-full mt-4 py-4 bg-gradient-to-r from-purple-600 to-pink-600 rounded-xl font-bold text-sm uppercase tracking-widest hover:from-purple-500 hover:to-pink-500 disabled:opacity-50 transition-all"
+                  className="w-full mt-4 py-4 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-xl font-bold text-sm uppercase tracking-widest hover:from-indigo-600 hover:to-purple-600 disabled:opacity-50 transition-all shadow-md"
                 >
                   {opLoading ? '部署中...' : '部署合约'}
                 </button>
                 
                 {contractAddr && (
-                  <div className="mt-4 p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
-                    <p className="text-green-400 text-xs mb-2">✓ 合约部署成功</p>
-                    <p className="text-[10px] font-mono text-gray-400 break-all">{contractAddr}</p>
+                  <div className="mt-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+                    <p className="text-emerald-700 text-xs mb-2 font-medium">✓ 合约部署成功</p>
+                    <p className="text-xs font-mono text-slate-500 break-all">{contractAddr}</p>
                   </div>
                 )}
               </div>
@@ -458,17 +405,16 @@ const Publisher: React.FC = () => {
           </div>
         )}
 
-        {/* === 生成二维码 Tab === */}
         {activeTab === 'qrcode' && (
           <div className="max-w-lg mx-auto">
-            <div className="bg-[#131722] border border-white/5 rounded-2xl p-8">
-              <h2 className="text-lg font-bold text-white mb-6">🔗 批量生成二维码</h2>
+            <div className="bg-white rounded-2xl shadow-soft border border-slate-100 p-8">
+              <h2 className="text-lg font-bold text-slate-800 mb-6">🔗 批量生成二维码</h2>
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs text-slate-400 mb-2 uppercase">选择已部署的书籍合约</label>
+                  <label className="block text-xs text-slate-500 mb-2 uppercase font-semibold">选择已部署的书籍合约</label>
                   <select 
-                    className="w-full bg-[#0b0e11] border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-cyan-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400"
                     value={contractAddr || ''}
                     onChange={(e) => setContractAddr(e.target.value)}
                   >
@@ -482,22 +428,20 @@ const Publisher: React.FC = () => {
                 </div>
                 
                 <div>
-                  <label className="block text-xs text-slate-400 mb-2 uppercase">生成数量</label>
+                  <label className="block text-xs text-slate-500 mb-2 uppercase font-semibold">生成数量</label>
                   <input 
                     type="number"
                     placeholder="100" 
-                    className="w-full bg-[#0b0e11] border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-cyan-500"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-400"
                     value={count} 
                     onChange={(e) => setCount(parseInt(e.target.value) || 100)}
-                    min={1}
-                    max={10000}
                   />
                 </div>
                 
                 <button
                   onClick={handleGenerateBatch}
                   disabled={opLoading || !contractAddr}
-                  className="w-full mt-4 py-4 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-xl font-bold text-sm uppercase tracking-widest hover:from-cyan-500 hover:to-blue-500 disabled:opacity-50 transition-all"
+                  className="w-full mt-4 py-4 bg-gradient-to-r from-teal-500 to-cyan-500 text-white rounded-xl font-bold text-sm uppercase tracking-widest hover:from-teal-600 hover:to-cyan-600 disabled:opacity-50 transition-all shadow-md"
                 >
                   {opLoading ? '生成中...' : `生成 ${count} 个二维码`}
                 </button>
@@ -506,17 +450,16 @@ const Publisher: React.FC = () => {
           </div>
         )}
 
-        {/* === 热力分析 Tab === */}
         {activeTab === 'analytics' && (
           <div className="space-y-6">
-            <div className="bg-[#131722] border border-white/5 rounded-2xl p-6">
-              <h2 className="text-sm font-bold text-white mb-4">🗺️ 地区读者分布</h2>
+            <div className="bg-white rounded-2xl shadow-soft border border-slate-100 p-6">
+              <h2 className="text-sm font-bold text-slate-800 mb-4">🗺️ 地区读者分布</h2>
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                 {regionRanks.map((region, idx) => (
-                  <div key={region.region} className="bg-white/5 rounded-xl p-4 text-center">
-                    <p className="text-[10px] text-slate-500 uppercase mb-1">#{idx + 1}</p>
-                    <p className="text-sm font-bold text-white">{region.region}</p>
-                    <p className="text-lg font-black text-cyan-400">{region.count}</p>
+                  <div key={region.region} className="bg-slate-50 rounded-xl p-4 text-center border border-slate-100">
+                    <p className="text-[10px] text-slate-400 uppercase mb-1">#{idx + 1}</p>
+                    <p className="text-sm font-bold text-slate-800">{region.region}</p>
+                    <p className="text-lg font-black text-indigo-600">{region.count}</p>
                   </div>
                 ))}
               </div>
@@ -524,7 +467,7 @@ const Publisher: React.FC = () => {
             
             <button
               onClick={() => navigate('/Heatmap')}
-              className="w-full py-4 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border border-cyan-500/30 rounded-xl font-bold text-cyan-400 hover:from-cyan-500/30 hover:to-blue-500/30 transition-all"
+              className="w-full py-4 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl font-bold text-indigo-600 hover:from-indigo-100 hover:to-purple-100 transition-all"
             >
               查看完整热力图 →
             </button>

@@ -47,7 +47,6 @@ export default function Bookshelf() {
       } catch (e: any) {
         console.error('加载书籍失败:', e);
         setError(e.message || '加载数据失败');
-        // 降级使用 Mock 数据
         setTickers(MOCK_BOOKS);
       } finally {
         setLoading(false);
@@ -57,7 +56,7 @@ export default function Bookshelf() {
     loadBooks();
   }, [fetchBooks]);
 
-  // 模拟"终焉大盘"实时波动逻辑
+  // 模拟实时波动
   useEffect(() => {
     if (tickers.length === 0) return;
     
@@ -89,7 +88,6 @@ export default function Bookshelf() {
     return () => clearInterval(interval);
   }, [tickers.length]);
 
-  // 根据当前语言渲染标题
   const renderTitle = () => {
     switch(i18n.language) {
       case 'zh': return '鲸之金库';
@@ -123,161 +121,144 @@ export default function Bookshelf() {
 
   if (loading) {
     return (
-      <div style={{ ...styles.container, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ 
-            width: 48, height: 48, 
-            border: '4px solid #833ab4', 
-            borderTopColor: 'transparent', 
-            borderRadius: '50%', 
-            animation: 'spin 1s linear infinite',
-            margin: '0 auto 16px'
-          }} />
-          <p style={{ color: '#666', fontSize: 12 }}>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-slate-500 text-sm">
             {isMockMode ? '加载 Mock 数据...' : '连接后端 API...'}
           </p>
         </div>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
   return (
-    <div style={styles.container}>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
       <ToastContainer />
       
-      {/* 顶部行情跑马灯与多语言切换组 */}
-      <div style={styles.tickerBar}>
-        <div style={styles.tickerContent}>
-          <span style={{ color: '#00ffad', fontWeight: 'bold' }}>● {t('market_status') || 'MARKET LIVE'}</span>
-          <span style={styles.divider}>|</span>
-          <span style={{ color: isMockMode ? '#22d3ee' : '#22c55e' }}>
-            {isMockMode ? 'MOCK MODE' : 'DEV API'}
-          </span>
-          <span style={styles.divider}>|</span>
-          <span>{t('index') || 'INDEX'}: <span style={{color: '#fff'}}>{(tickers.reduce((acc, curr) => acc + curr.sales, 0) / 10000).toFixed(2)}K</span></span>
+      {/* 顶部导航栏 */}
+      <div className="bg-white/80 backdrop-blur-lg border-b border-slate-200 sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-6">
+            <span className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span className="text-emerald-600 text-sm font-medium">{t('market_status') || 'MARKET LIVE'}</span>
+            </span>
+            <span className="text-slate-300">|</span>
+            <span className={`text-sm font-medium ${isMockMode ? 'text-amber-600' : 'text-emerald-600'}`}>
+              {isMockMode ? 'MOCK MODE' : 'DEV API'}
+            </span>
+            <span className="text-slate-300">|</span>
+            <span className="text-slate-600 text-sm">
+              {t('index') || 'INDEX'}: <span className="font-semibold text-slate-800">{(tickers.reduce((acc, curr) => acc + curr.sales, 0) / 10000).toFixed(2)}K</span>
+            </span>
+          </div>
           
-          {error && (
-            <>
-              <span style={styles.divider}>|</span>
-              <span style={{ color: '#ef4444', fontSize: 10 }}>⚠️ {error.slice(0, 30)}</span>
-            </>
-          )}
-          
-          {/* 扫码按钮 */}
-          <button
-            onClick={() => setShowScanModal(true)}
-            style={styles.scanButton}
-          >
-            📱 Scan QR
-          </button>
-          
-          {/* 语言切换按钮组 */}
-          <div style={styles.langButtonGroup}>
-            {LANGUAGES.map((lang) => (
-              <button
-                key={lang.code}
-                onClick={() => i18n.changeLanguage(lang.code)}
-                style={{
-                  ...styles.langToggleBtn,
-                  backgroundColor: i18n.language === lang.code ? '#833ab4' : 'transparent',
-                  color: i18n.language === lang.code ? '#fff' : '#666',
-                  borderColor: i18n.language === lang.code ? '#833ab4' : '#333',
-                }}
-              >
-                {lang.label}
-              </button>
-            ))}
+          <div className="flex items-center gap-4">
+            {error && (
+              <span className="text-red-500 text-xs bg-red-50 px-2 py-1 rounded">⚠️ {error.slice(0, 30)}</span>
+            )}
+            
+            <button
+              onClick={() => setShowScanModal(true)}
+              className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:from-indigo-600 hover:to-purple-600 transition-all shadow-md hover:shadow-lg"
+            >
+              📱 Scan QR
+            </button>
+            
+            <div className="flex gap-1 bg-slate-100 p-1 rounded-lg">
+              {LANGUAGES.map((lang) => (
+                <button
+                  key={lang.code}
+                  onClick={() => i18n.changeLanguage(lang.code)}
+                  className={`px-2 py-1 text-xs font-medium rounded transition-all ${
+                    i18n.language === lang.code 
+                      ? 'bg-indigo-500 text-white shadow-sm' 
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  {lang.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
 
-      <main style={styles.main}>
-        <header style={styles.header}>
-          <div>
-            <h1 style={styles.title}>
-              {renderTitle()}{' '}
-              <span style={styles.terminalText}>TERMINAL</span>
-            </h1>
-            <p style={styles.subtitle}>{t('subtitle') || 'Real-time Book Sales & Prediction Market'}</p>
-            <div style={{
-              ...styles.demoBadge,
-              backgroundColor: isMockMode ? 'rgba(34, 211, 238, 0.1)' : 'rgba(34, 197, 94, 0.1)',
-              borderColor: isMockMode ? 'rgba(34, 211, 238, 0.3)' : 'rgba(34, 197, 94, 0.3)',
-              color: isMockMode ? '#22d3ee' : '#22c55e',
-            }}>
-              {isMockMode ? '🔧 DEMO MODE - No Backend Required' : '🟢 DEV API - Connected to Backend'}
-            </div>
+      <main className="max-w-7xl mx-auto px-6 py-10">
+        <header className="mb-10">
+          <h1 className="text-4xl font-black text-slate-800 mb-2">
+            {renderTitle()}{' '}
+            <span className="bg-gradient-to-r from-indigo-500 to-purple-500 bg-clip-text text-transparent">
+              TERMINAL
+            </span>
+          </h1>
+          <p className="text-slate-500">{t('subtitle') || 'Real-time Book Sales & Prediction Market'}</p>
+          <div className={`inline-flex items-center gap-2 mt-4 px-4 py-2 rounded-full text-sm font-medium ${
+            isMockMode 
+              ? 'bg-amber-50 text-amber-700 border border-amber-200' 
+              : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+          }`}>
+            {isMockMode ? '🔧 DEMO MODE - No Backend Required' : '🟢 DEV API - Connected to Backend'}
           </div>
         </header>
 
-        <div style={styles.tableContainer}>
-          <table style={styles.table}>
+        <div className="bg-white rounded-2xl shadow-soft border border-slate-200 overflow-hidden">
+          <table className="w-full">
             <thead>
-              <tr style={styles.theadRow}>
-                <th style={styles.th}>{t('th_asset') || 'ASSET'}</th>
-                <th style={styles.th}>{t('th_title') || 'TITLE'}</th>
-                <th style={{ ...styles.th, textAlign: 'right' }}>{t('th_sales') || 'SALES'}</th>
-                <th style={{ ...styles.th, textAlign: 'right' }}>POOL</th>
-                <th style={{ ...styles.th, textAlign: 'right' }}>{t('th_chg') || 'CHG'}</th>
-                <th style={{ ...styles.th, textAlign: 'center' }}>STATUS</th>
-                <th style={{ ...styles.th, textAlign: 'center' }}>{t('action_trade') || 'ACTION'}</th>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('th_asset') || 'ASSET'}</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('th_title') || 'TITLE'}</th>
+                <th className="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('th_sales') || 'SALES'}</th>
+                <th className="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">POOL</th>
+                <th className="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('th_chg') || 'CHG'}</th>
+                <th className="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">STATUS</th>
+                <th className="px-6 py-4 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('action_trade') || 'ACTION'}</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-slate-100">
               {tickers.map((book, index) => (
                 <tr 
                   key={book.id} 
-                  style={{
-                    ...styles.tr,
-                    backgroundColor: lastUpdatedIndex === index ? 'rgba(131, 58, 180, 0.15)' : 'transparent',
-                  }}
+                  className={`hover:bg-slate-50 transition-colors cursor-pointer ${
+                    lastUpdatedIndex === index ? 'bg-indigo-50' : ''
+                  }`}
                   onClick={() => handleBookClick(book)}
                 >
-                  <td style={styles.td}>
-                    <div style={styles.symbolBadge}>{book.symbol}</div>
+                  <td className="px-6 py-4">
+                    <span className="inline-flex items-center px-3 py-1 rounded-lg bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-600 font-semibold text-sm border border-indigo-100">
+                      {book.symbol}
+                    </span>
                   </td>
-                  <td style={styles.td}>
-                    <div style={styles.bookName}>{book.title}</div>
-                    <div style={styles.bookAuthor}>{book.author}</div>
+                  <td className="px-6 py-4">
+                    <div className="font-semibold text-slate-800">{book.title}</div>
+                    <div className="text-slate-400 text-sm">{book.author}</div>
                   </td>
-                  <td style={{ 
-                    ...styles.td, 
-                    ...styles.numeric, 
-                    color: lastUpdatedIndex === index ? '#00ffad' : '#f0f3fa',
-                    transition: 'color 0.3s ease'
-                  }}>
+                  <td className={`px-6 py-4 text-right font-mono font-semibold ${
+                    lastUpdatedIndex === index ? 'text-emerald-600' : 'text-slate-800'
+                  }`}>
                     {book.sales.toLocaleString()}
                   </td>
-                  <td style={{ ...styles.td, ...styles.numeric, color: '#a855f7' }}>
+                  <td className="px-6 py-4 text-right font-mono text-purple-600 font-semibold">
                     ${(book.predictionPool / 1000).toFixed(1)}K
                   </td>
-                  <td style={{ 
-                    ...styles.td, 
-                    ...styles.numeric, 
-                    color: book.change.startsWith('+') ? '#00ffad' : '#ff4d4d' 
-                  }}>
+                  <td className={`px-6 py-4 text-right font-mono font-semibold ${
+                    book.change.startsWith('+') ? 'text-emerald-600' : 'text-red-500'
+                  }`}>
                     {book.change}
                   </td>
-                  <td style={{ ...styles.td, textAlign: 'center' }}>
-                    <span style={{
-                      ...styles.statusBadge,
-                      backgroundColor: book.verificationStatus === 'Verified Genuine' 
-                        ? 'rgba(34, 197, 94, 0.2)' 
-                        : 'rgba(239, 68, 68, 0.2)',
-                      color: book.verificationStatus === 'Verified Genuine' 
-                        ? '#22c55e' 
-                        : '#ef4444',
-                      borderColor: book.verificationStatus === 'Verified Genuine'
-                        ? 'rgba(34, 197, 94, 0.3)'
-                        : 'rgba(239, 68, 68, 0.3)'
-                    }}>
+                  <td className="px-6 py-4 text-center">
+                    <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full ${
+                      book.verificationStatus === 'Verified Genuine' 
+                        ? 'bg-emerald-100 text-emerald-600' 
+                        : 'bg-red-100 text-red-500'
+                    }`}>
                       {book.verificationStatus === 'Verified Genuine' ? '✓' : '⚠️'}
                     </span>
                   </td>
-                  <td style={{ ...styles.td, textAlign: 'center' }}>
+                  <td className="px-6 py-4 text-center">
                     <button 
-                      style={styles.actionBtn}
+                      className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-lg text-sm font-medium hover:from-indigo-600 hover:to-purple-600 transition-all shadow-sm hover:shadow-md"
                       onClick={(e) => handleBetClick(e, book)}
                     >
                       PREDICT
@@ -290,11 +271,6 @@ export default function Bookshelf() {
         </div>
       </main>
 
-      {/* 视觉特效层 */}
-      <div style={styles.scanline}></div>
-      <div style={styles.gridOverlay}></div>
-
-      {/* Modals */}
       <ScanVerifyModal 
         isOpen={showScanModal}
         onClose={() => setShowScanModal(false)}
@@ -311,125 +287,3 @@ export default function Bookshelf() {
     </div>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  container: {
-    backgroundColor: '#050505',
-    minHeight: '100vh',
-    color: '#a0a0a0',
-    fontFamily: '"Inter", "Roboto Mono", monospace',
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  tickerBar: {
-    backgroundColor: '#000',
-    borderBottom: '1px solid #1a1a1a',
-    padding: '8px 20px',
-    fontSize: '11px',
-    letterSpacing: '1px',
-    zIndex: 10,
-    position: 'relative',
-  },
-  tickerContent: { display: 'flex', gap: '20px', alignItems: 'center' },
-  divider: { color: '#333' },
-  scanButton: {
-    background: 'linear-gradient(135deg, #22d3ee, #3b82f6)',
-    border: 'none',
-    color: '#fff',
-    padding: '6px 16px',
-    fontSize: '10px',
-    fontWeight: 'bold',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    marginLeft: 'auto',
-    marginRight: '10px',
-    textTransform: 'uppercase',
-    letterSpacing: '1px'
-  },
-  langButtonGroup: {
-    display: 'flex',
-    gap: '4px',
-    backgroundColor: '#0a0a0a',
-    padding: '2px',
-    borderRadius: '4px',
-    border: '1px solid #1a1a1a'
-  },
-  langToggleBtn: {
-    background: 'none',
-    border: '1px solid transparent',
-    fontSize: '9px',
-    padding: '2px 8px',
-    cursor: 'pointer',
-    borderRadius: '2px',
-    transition: 'all 0.2s ease',
-    fontWeight: 'bold',
-  },
-  main: { padding: '40px 20px', maxWidth: '1200px', margin: '0 auto', position: 'relative', zIndex: 1 },
-  header: { marginBottom: '40px' },
-  title: { color: '#fff', fontSize: '32px', fontWeight: 900, margin: 0, letterSpacing: '-1.5px' },
-  terminalText: { 
-    color: '#833ab4', 
-    textShadow: '0 0 20px rgba(131, 58, 180, 0.6)',
-    fontStyle: 'italic'
-  },
-  subtitle: { fontSize: '14px', color: '#444', margin: '5px 0 0 0', fontWeight: 400 },
-  demoBadge: {
-    display: 'inline-block',
-    marginTop: '10px',
-    padding: '6px 12px',
-    border: '1px solid',
-    borderRadius: '6px',
-    fontSize: '10px',
-    fontWeight: 'bold',
-    letterSpacing: '1px'
-  },
-  tableContainer: {
-    backgroundColor: 'rgba(10, 10, 10, 0.95)',
-    backdropFilter: 'blur(15px)',
-    border: '1px solid #1a1a1a',
-    borderRadius: '8px',
-    overflow: 'hidden'
-  },
-  table: { width: '100%', borderCollapse: 'collapse' },
-  theadRow: { backgroundColor: 'rgba(255,255,255,0.02)' },
-  th: { padding: '15px 16px', color: '#444', fontSize: '10px', textTransform: 'uppercase', textAlign: 'left', borderBottom: '1px solid #1a1a1a', letterSpacing: '1px' },
-  td: { padding: '16px', borderBottom: '1px solid #0f0f0f' },
-  tr: { transition: 'background-color 0.4s ease', cursor: 'pointer' },
-  symbolBadge: { color: '#833ab4', fontWeight: 'bold', border: '1px solid #2a2a2a', padding: '4px 8px', display: 'inline-block', borderRadius: '4px', fontSize: '11px' },
-  bookName: { color: '#efefef', fontWeight: 600, fontSize: '14px' },
-  bookAuthor: { color: '#555', fontSize: '11px', marginTop: '2px' },
-  numeric: { fontFamily: '"Roboto Mono", monospace', textAlign: 'right' },
-  statusBadge: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '24px',
-    height: '24px',
-    borderRadius: '50%',
-    border: '1px solid',
-    fontSize: '12px'
-  },
-  actionBtn: {
-    backgroundColor: 'transparent',
-    border: '1px solid #833ab4',
-    color: '#833ab4',
-    padding: '6px 16px',
-    fontSize: '10px',
-    cursor: 'pointer',
-    fontWeight: 'bold',
-    borderRadius: '4px',
-    transition: 'all 0.2s ease',
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px'
-  },
-  scanline: {
-    width: '100%', height: '2px', zIndex: 5, background: 'rgba(131, 58, 180, 0.05)',
-    position: 'absolute', pointerEvents: 'none', top: 0,
-    boxShadow: '0 0 10px rgba(131, 58, 180, 0.2)',
-  },
-  gridOverlay: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    backgroundImage: `linear-gradient(#080808 1px, transparent 1px), linear-gradient(90deg, #080808 1px, transparent 1px)`,
-    backgroundSize: '30px 30px', zIndex: 0, pointerEvents: 'none',
-  }
-};

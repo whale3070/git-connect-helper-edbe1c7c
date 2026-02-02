@@ -29,13 +29,13 @@ export const CyberpunkToast: React.FC<ToastProps> = ({
   const getStyles = () => {
     switch (type) {
       case 'success':
-        return 'from-emerald-500/20 to-cyan-500/20 border-emerald-500/50 text-emerald-400';
+        return 'bg-emerald-50 border-emerald-300 text-emerald-700';
       case 'error':
-        return 'from-red-500/20 to-orange-500/20 border-red-500/50 text-red-400';
+        return 'bg-red-50 border-red-300 text-red-700';
       case 'warning':
-        return 'from-yellow-500/20 to-orange-500/20 border-yellow-500/50 text-yellow-400';
+        return 'bg-amber-50 border-amber-300 text-amber-700';
       default:
-        return 'from-blue-500/20 to-purple-500/20 border-blue-500/50 text-blue-400';
+        return 'bg-indigo-50 border-indigo-300 text-indigo-700';
     }
   };
 
@@ -48,19 +48,28 @@ export const CyberpunkToast: React.FC<ToastProps> = ({
     }
   };
 
+  const getIconBg = () => {
+    switch (type) {
+      case 'success': return 'bg-emerald-100';
+      case 'error': return 'bg-red-100';
+      case 'warning': return 'bg-amber-100';
+      default: return 'bg-indigo-100';
+    }
+  };
+
   return (
     <div
       className={`fixed top-6 right-6 z-[9999] max-w-md transform transition-all duration-300 ${
         isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
       }`}
     >
-      <div className={`bg-gradient-to-r ${getStyles()} border backdrop-blur-xl rounded-2xl p-4 shadow-2xl`}>
+      <div className={`${getStyles()} border rounded-2xl p-4 shadow-lg`}>
         <div className="flex items-start gap-3">
-          <div className="w-8 h-8 rounded-full bg-black/30 flex items-center justify-center text-lg font-bold">
+          <div className={`w-8 h-8 rounded-full ${getIconBg()} flex items-center justify-center text-lg font-bold`}>
             {getIcon()}
           </div>
           <div className="flex-1">
-            <p className="font-medium text-sm text-white">{message}</p>
+            <p className="font-medium text-sm text-slate-800">{message}</p>
             {txHash && (
               <p className="mt-2 text-[10px] font-mono opacity-60 break-all">
                 TX: {txHash.slice(0, 10)}...{txHash.slice(-8)}
@@ -72,7 +81,7 @@ export const CyberpunkToast: React.FC<ToastProps> = ({
               setIsVisible(false);
               setTimeout(onClose, 300);
             }}
-            className="text-white/40 hover:text-white transition-colors"
+            className="text-slate-400 hover:text-slate-600 transition-colors"
           >
             ✕
           </button>
