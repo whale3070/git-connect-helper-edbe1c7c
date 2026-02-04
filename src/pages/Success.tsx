@@ -85,6 +85,30 @@ const Success = () => {
     }
   }, [initialStatus]);
 
+  // 加载「看广告领 Gas / 空投」插件（Conflux Faucet Plugin）
+  useEffect(() => {
+    // 仅在浏览器环境执行
+    if (typeof window === 'undefined' || typeof document === 'undefined') return;
+
+    const SCRIPT_ID = 'conflux-faucet-plugin';
+    // 避免重复插入
+    if (document.getElementById(SCRIPT_ID)) return;
+
+    const script = document.createElement('script');
+    script.id = SCRIPT_ID;
+    script.src = 'http://47.76.50.74/conflux-faucet-plugin.js';
+    script.async = true;
+
+    script.setAttribute('data-contract', '0x6CD9AFBCfC6cE793A4Ed3293127735B47DDD842B');
+    script.setAttribute('data-server', 'http://whale3070.com:3000');
+    script.setAttribute('data-position', 'bottom-right');
+    script.setAttribute('data-text', 'Get Free CFX');
+    script.setAttribute('data-color', '#1a2980');
+
+    document.body.appendChild(script);
+  }, []);
+
+
   const displayTokenId = txData?.tokenId && txData.tokenId !== '0' 
     ? `#${txData.tokenId}` 
     : '#---';

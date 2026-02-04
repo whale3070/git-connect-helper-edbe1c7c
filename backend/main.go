@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/subtle"
+	"encoding/json"
 	"fmt"
 	"log"
 	"math/big"
@@ -16,6 +18,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
 
+	"whale-vault/relay/internal/blockchain"
 	"whale-vault/relay/internal/handlers"
 )
 
@@ -33,7 +36,12 @@ func main() {
 	// ========================================
 	// 1. 初始化基础环境
 	// ========================================
-	godotenv.Load()
+	_ = godotenv.Load("/root/git-connect-helper-edbe1c7c/backend/.env")
+	if err := godotenv.Load("/root/git-connect-helper-edbe1c7c/backend/.env"); err != nil {
+		log.Println("⚠️ 未加载 .env:", err)
+	} else {
+		log.Println("✅ 已加载 .env")
+	}
 
 	// 初始化 Redis
 	redisAddr := os.Getenv("REDIS_ADDR")
@@ -41,21 +49,32 @@ func main() {
 		redisAddr = "localhost:6379"
 	}
 	rdb = redis.NewClient(&redis.Options{
-		Addr: redisAddr,
+		Addr:     redisAddr,
+		Protocol: 2, // ✅ 强制 RESP2，FT.SEARCH 返回数组结构，你的 parseFTSearchResult 就能正常工作
 	})
-	log.Println("✅ Redis 连接成功")
+	log.Println("✅ Redis 连接成功, addr =", redisAddr)
 
 	// 初始化以太坊客户端
 	var err error
-	client, err = ethclient.Dial(os.Getenv("RPC_URL"))
+	rpcURL := strings.TrimSpace(os.Getenv("RPC_URL"))
+	if rpcURL == "" {
+		log.Fatal("❌ RPC_URL 未设置")
+	}
+	client, err = ethclient.Dial(rpcURL)
 	if err != nil {
 		log.Fatalf("❌ RPC 连接失败: %v", err)
 	}
 	log.Println("✅ 以太坊客户端连接成功")
 
 	// 解析 Chain ID
-	cidStr := os.Getenv("CHAIN_ID")
-	cInt, _ := strconv.ParseInt(cidStr, 10, 64)
+	cidStr := strings.TrimSpace(os.Getenv("CHAIN_ID"))
+	if cidStr == "" {
+		log.Fatal("❌ CHAIN_ID 未设置")
+	}
+	cInt, err := strconv.ParseInt(cidStr, 10, 64)
+	if err != nil || cInt <= 0 {
+		log.Fatalf("❌ CHAIN_ID 无效: %s", cidStr)
+	}
 	chainID = big.NewInt(cInt)
 
 	// ========================================
@@ -67,95 +86,91 @@ func main() {
 	// 3. 实例化业务处理器 (依赖注入)
 	// ========================================
 
-	// 读者端处理器 (扫码、验证、兑奖)
 	relayH := &handlers.RelayHandler{
 		RDB:    rdb,
 		Client: client,
 	}
 
-	// 大盘市场处理器 (书籍排行榜)
 	marketH := &handlers.MarketHandler{
 		RDB: rdb,
 	}
 
-	// 工厂合约处理器 (部署新书合约)
 	factoryH := &handlers.FactoryHandler{
 		RDB:     rdb,
 		Client:  client,
 		ChainID: chainID,
 	}
 
-	// NFT 铸造处理器
 	mintH := &handlers.MintHandler{
 		RDB:    rdb,
 		Client: client,
 	}
 
-	// 身份验证处理器
 	authH := &handlers.AuthHandler{
 		RDB:    rdb,
 		Client: client,
+	}
+
+	// ✅ 出版社处理器（批量生成二维码 ZIP / 部署书合约）
+	factoryAddr := strings.TrimSpace(os.Getenv("FACTORY_ADDR"))
+	if factoryAddr == "" {
+		log.Println("⚠️ FACTORY_ADDR 未设置：publisher.CreateBook 将无法正常调用工厂合约")
+	}
+	publisherH := &handlers.PublisherHandler{
+		RDB:         rdb,
+		Client:      client,
+		FactoryAddr: factoryAddr,
 	}
 
 	// ========================================
 	// 4. 注册路由
 	// ========================================
 	r := mux.NewRouter()
-
-	// 全局请求日志中间件
 	r.Use(requestLoggerMiddleware)
 
 	// --- 身份验证路由 ---
-	// GET  /secret/get-binding      获取地址绑定信息
-	// GET  /secret/verify           验证激活码并分配角色
 	r.HandleFunc("/secret/get-binding", authH.GetBinding).Methods("GET", "OPTIONS")
 	r.HandleFunc("/secret/verify", authH.Verify).Methods("GET", "OPTIONS")
 
 	// --- 读者端路由 (Relay 业务) ---
-	// POST /relay/save-code         验证并暂存书码
-	// POST /relay/reward            执行 5 码兑换
-	// GET  /relay/stats             获取推荐人统计/排行榜
 	r.HandleFunc("/relay/save-code", relayH.SaveCode).Methods("POST", "OPTIONS")
 	r.HandleFunc("/relay/reward", relayH.Reward).Methods("POST", "OPTIONS")
 	r.HandleFunc("/relay/stats", relayH.GetReferrerStats).Methods("GET", "OPTIONS")
 
 	// --- NFT 铸造路由 ---
-	// POST /relay/mint              铸造 NFT
-	// GET  /api/v1/nft/total-minted 获取链上总铸造量
 	r.HandleFunc("/relay/mint", mintH.Mint).Methods("POST", "OPTIONS")
 	r.HandleFunc("/api/v1/nft/total-minted", mintH.GetTotalMinted).Methods("GET", "OPTIONS")
-    // ✅ 新增：查询 mint 交易结果
-    //r.HandleFunc("/relay/tx/", mintH.GetTxResult).Methods("GET", "OPTIONS")
 	r.PathPrefix("/relay/tx/").HandlerFunc(mintH.GetTxResult).Methods("GET", "OPTIONS")
 
-	
 	// --- 大盘市场路由 ---
-	// GET /api/v1/tickers           获取书籍销量排行榜 (兼容旧路径)
-	// GET /api/v1/market/tickers    获取书籍销量排行榜
 	r.HandleFunc("/api/v1/tickers", marketH.GetTickers).Methods("GET", "OPTIONS")
 	r.HandleFunc("/api/v1/market/tickers", marketH.GetTickers).Methods("GET", "OPTIONS")
 
 	// --- 工厂合约路由 (出版社后端代签) ---
-	// GET  /api/v1/precheck-code          预检查激活码
-	// GET  /api/v1/factory/verify-publisher 验证出版社身份
-	// POST /api/v1/factory/create         创建书籍 (旧接口)
-	// POST /api/v1/factory/deploy-book    部署书籍合约
-	// GET  /api/v1/publisher/balance      查询出版社余额
 	r.HandleFunc("/api/v1/precheck-code", factoryH.PrecheckCode).Methods("GET", "OPTIONS")
 	r.HandleFunc("/api/v1/factory/verify-publisher", factoryH.VerifyPublisher).Methods("GET", "OPTIONS")
-	r.HandleFunc("/api/v1/factory/create", factoryH.CreateBook).Methods("POST", "OPTIONS")
-	r.HandleFunc("/api/v1/factory/deploy-book", factoryH.DeployBook).Methods("POST", "OPTIONS")
+
 	r.HandleFunc("/api/v1/publisher/balance", factoryH.GetPublisherBalance).Methods("GET", "OPTIONS")
 
+	// ✅ 出版社：批量生成读者专用二维码 ZIP
+	r.HandleFunc("/api/v1/publisher/zip", publisherH.GenerateAndDownloadZip).Methods("GET", "OPTIONS")
+	// ✅ 出版社：搜索书籍（RediSearch）
+	r.HandleFunc("/api/v1/publisher/books/search", publisherH.SearchPublisherBooks).Methods("GET", "OPTIONS")
+
+	// 出版社：通过工厂部署书合约 / 后端从 Redis 取私钥部署
+	r.HandleFunc("/api/v1/factory/create", factoryH.DeployBook).Methods("POST", "OPTIONS")
+	//r.HandleFunc("/api/v1/publisher/create-book", factoryH.DeployBook).Methods("POST", "OPTIONS")
+	r.HandleFunc("/api/v1/publisher/deploy-book", factoryH.DeployBook).Methods("POST", "OPTIONS")
+
 	// --- 数据分析路由 ---
-	// GET /api/v1/analytics/distribution 获取读者地理分布热力图
-	// GET /api/v1/reader/location        获取当前读者位置
 	r.HandleFunc("/api/v1/analytics/distribution", relayH.GetDistribution).Methods("GET", "OPTIONS")
-	r.HandleFunc("/api/v1/reader/location", mintH.GetReaderLocation).Methods("GET", "OPTIONS")
 
 	// --- 管理员路由 ---
-	// GET /api/admin/check-access 检查管理员权限
 	r.HandleFunc("/api/admin/check-access", authH.CheckAdminAccess).Methods("GET", "OPTIONS")
+
+	// ✅ 新增：管理员给出版社充值 USDT（调用 usdt.go）
+	// POST /api/admin/usdt/recharge  body: {"to":"0x...","amount":1000}
+	r.HandleFunc("/api/admin/usdt/recharge", adminRechargeUSDTHandler()).Methods("POST", "OPTIONS")
 
 	// ========================================
 	// 5. 启动服务
@@ -166,7 +181,6 @@ func main() {
 	}
 
 	fmt.Printf("🚀 Whale Vault 后端启动成功 (监听端口: %s)\n", port)
-
 	srv := &http.Server{
 		Addr:    "0.0.0.0:" + port,
 		Handler: corsMiddleware(r),
@@ -175,10 +189,112 @@ func main() {
 }
 
 // ========================================
+// 新增：USDT 充值接口（调用 internal/blockchain/usdt.go）
+// ========================================
+
+type rechargeUSDTReq struct {
+	To     string `json:"to"`
+	Amount int64  `json:"amount"` // 人类单位：例如 1000 表示 1000 USDT
+	// 可选：如果你想加“备注/订单号”，可扩展字段
+}
+
+type apiResp struct {
+	Ok     bool   `json:"ok"`
+	Error  string `json:"error,omitempty"`
+	TxHash string `json:"txHash,omitempty"`
+}
+
+func adminRechargeUSDTHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		// （可选）用一个简单 header 保护，避免公网随便打
+		// 在 .env 配 ADMIN_API_KEY=xxx
+		// 请求带：Authorization: Bearer xxx
+		if key := strings.TrimSpace(os.Getenv("ADMIN_API_KEY")); key != "" {
+			got := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+			if subtle.ConstantTimeCompare([]byte(got), []byte(key)) != 1 {
+				writeJSON(w, http.StatusUnauthorized, apiResp{Ok: false, Error: "unauthorized"})
+				return
+			}
+		}
+
+		var req rechargeUSDTReq
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSON(w, http.StatusBadRequest, apiResp{Ok: false, Error: "invalid json"})
+			return
+		}
+
+		to := strings.TrimSpace(req.To)
+		if !isHexAddress(to) {
+			writeJSON(w, http.StatusBadRequest, apiResp{Ok: false, Error: "invalid 'to' address"})
+			return
+		}
+		if req.Amount <= 0 {
+			writeJSON(w, http.StatusBadRequest, apiResp{Ok: false, Error: "amount must be > 0"})
+			return
+		}
+
+		contract := strings.TrimSpace(os.Getenv("USDT_CONTRACT"))
+		if !isHexAddress(contract) {
+			writeJSON(w, http.StatusBadRequest, apiResp{Ok: false, Error: "USDT_CONTRACT not set or invalid"})
+			return
+		}
+
+		rpcURL := strings.TrimSpace(os.Getenv("RPC_URL"))
+		if rpcURL == "" {
+			writeJSON(w, http.StatusInternalServerError, apiResp{Ok: false, Error: "RPC_URL not set"})
+			return
+		}
+
+		priv := strings.TrimSpace(os.Getenv("USDT_ADMIN_PRIVKEY"))
+		priv = strings.TrimPrefix(priv, "0x")
+		if priv == "" {
+			writeJSON(w, http.StatusInternalServerError, apiResp{Ok: false, Error: "USDT_ADMIN_PRIVKEY not set"})
+			return
+		}
+
+		// ✅ 这里就是调用你上传的 usdt.go
+		c := blockchain.NewUSDTClient(contract, rpcURL, priv)
+		tx, err := c.Recharge(to, req.Amount)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, apiResp{Ok: false, Error: err.Error()})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, apiResp{Ok: true, TxHash: tx})
+	}
+}
+
+func isHexAddress(s string) bool {
+	s = strings.TrimSpace(s)
+	if !strings.HasPrefix(s, "0x") {
+		return false
+	}
+	if len(s) != 42 {
+		return false
+	}
+	for _, ch := range s[2:] {
+		if !((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')) {
+			return false
+		}
+	}
+	return true
+}
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+// ========================================
 // 中间件
 // ========================================
 
-// requestLoggerMiddleware 全局请求日志
 func requestLoggerMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("🔔 [REQ] %s %s | From: %s\n", r.Method, r.URL.Path, r.RemoteAddr)
@@ -186,7 +302,6 @@ func requestLoggerMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// corsMiddleware 跨域处理
 func corsMiddleware(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -204,7 +319,6 @@ func corsMiddleware(h http.Handler) http.Handler {
 // 工具函数 (供其他包使用)
 // ========================================
 
-// GetClientIP 获取客户端真实 IP
 func GetClientIP(r *http.Request) string {
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 		parts := strings.Split(xff, ",")
@@ -220,7 +334,6 @@ func GetClientIP(r *http.Request) string {
 	return ip
 }
 
-// DeriveAddressFromPrivateKey 从私钥推导地址
 func DeriveAddressFromPrivateKey(privateKeyHex string) string {
 	privateKey, err := crypto.HexToECDSA(strings.TrimPrefix(privateKeyHex, "0x"))
 	if err != nil {

@@ -1,0 +1,330 @@
+2026-02-03 11:19:55,117 - DEBUG - Session cached: https://evmtestnet.confluxrpc.com, <requests.sessions.Session object at 0x7d173f68baa0>
+2026-02-03 11:19:55,118 - DEBUG - Making request HTTP. URI: https://evmtestnet.confluxrpc.com, Method: web3_clientVersion
+2026-02-03 11:19:55,120 - DEBUG - Starting new HTTPS connection (1): evmtestnet.confluxrpc.com:443
+2026-02-03 11:19:56,749 - DEBUG - https://evmtestnet.confluxrpc.com:443 "POST / HTTP/1.1" 200 114
+2026-02-03 11:19:56,751 - DEBUG - Getting response HTTP. URI: https://evmtestnet.confluxrpc.com, Method: web3_clientVersion, Response: {'jsonrpc': '2.0', 'id': 0, 'result': 'conflux-rust/v3.0.1-testnet-fix-08d6f3b-20250811/x86_64-linux-gnu/rustc1.86.0'}
+2026-02-03 11:19:56,752 - DEBUG - Making request. Method: eth_chainId
+2026-02-03 11:19:56,754 - DEBUG - Making request HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_chainId
+2026-02-03 11:19:56,951 - DEBUG - https://evmtestnet.confluxrpc.com:443 "POST / HTTP/1.1" 200 41
+2026-02-03 11:19:56,952 - DEBUG - Getting response HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_chainId, Response: {'jsonrpc': '2.0', 'id': 1, 'result': '0x47'}
+2026-02-03 11:19:56,953 - INFO - ✅ Connected to Conflux eSpace Testnet (Chain ID: 71)
+2026-02-03 11:19:56,958 - INFO - ✅ Database initialized
+2026-02-03 11:19:56,973 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:3000
+ * Running on http://198.55.109.102:3000
+2026-02-03 11:19:56,973 - INFO - [33mPress CTRL+C to quit[0m
+2026-02-03 11:19:56,974 - INFO -  * Restarting with stat
+2026-02-03 11:19:57,498 - DEBUG - Session cached: https://evmtestnet.confluxrpc.com, <requests.sessions.Session object at 0x702c46de87a0>
+2026-02-03 11:19:57,498 - DEBUG - Making request HTTP. URI: https://evmtestnet.confluxrpc.com, Method: web3_clientVersion
+2026-02-03 11:19:57,499 - DEBUG - Starting new HTTPS connection (1): evmtestnet.confluxrpc.com:443
+2026-02-03 11:19:58,363 - DEBUG - https://evmtestnet.confluxrpc.com:443 "POST / HTTP/1.1" 200 114
+2026-02-03 11:19:58,364 - DEBUG - Getting response HTTP. URI: https://evmtestnet.confluxrpc.com, Method: web3_clientVersion, Response: {'jsonrpc': '2.0', 'id': 0, 'result': 'conflux-rust/v3.0.1-testnet-fix-08d6f3b-20250811/x86_64-linux-gnu/rustc1.86.0'}
+2026-02-03 11:19:58,365 - DEBUG - Making request. Method: eth_chainId
+2026-02-03 11:19:58,368 - DEBUG - Making request HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_chainId
+2026-02-03 11:19:58,563 - DEBUG - https://evmtestnet.confluxrpc.com:443 "POST / HTTP/1.1" 200 41
+2026-02-03 11:19:58,564 - DEBUG - Getting response HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_chainId, Response: {'jsonrpc': '2.0', 'id': 1, 'result': '0x47'}
+2026-02-03 11:19:58,565 - INFO - ✅ Connected to Conflux eSpace Testnet (Chain ID: 71)
+2026-02-03 11:19:58,566 - INFO - ✅ Database initialized
+2026-02-03 11:19:58,576 - WARNING -  * Debugger is active!
+2026-02-03 11:19:58,578 - INFO -  * Debugger PIN: 930-754-416
+2026-02-03 11:24:05,463 - DEBUG - Session cached: https://evmtestnet.confluxrpc.com, <requests.sessions.Session object at 0x72c8fe1dc830>
+2026-02-03 11:24:05,464 - DEBUG - Making request HTTP. URI: https://evmtestnet.confluxrpc.com, Method: web3_clientVersion
+2026-02-03 11:24:05,465 - DEBUG - Starting new HTTPS connection (1): evmtestnet.confluxrpc.com:443
+2026-02-03 11:24:06,123 - DEBUG - https://evmtestnet.confluxrpc.com:443 "POST / HTTP/1.1" 200 114
+2026-02-03 11:24:06,124 - DEBUG - Getting response HTTP. URI: https://evmtestnet.confluxrpc.com, Method: web3_clientVersion, Response: {'jsonrpc': '2.0', 'id': 0, 'result': 'conflux-rust/v3.0.1-testnet-fix-08d6f3b-20250811/x86_64-linux-gnu/rustc1.86.0'}
+2026-02-03 11:24:06,126 - DEBUG - Making request. Method: eth_chainId
+2026-02-03 11:24:06,128 - DEBUG - Making request HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_chainId
+2026-02-03 11:24:06,538 - DEBUG - https://evmtestnet.confluxrpc.com:443 "POST / HTTP/1.1" 200 41
+2026-02-03 11:24:06,539 - DEBUG - Getting response HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_chainId, Response: {'jsonrpc': '2.0', 'id': 1, 'result': '0x47'}
+2026-02-03 11:24:06,540 - INFO - ✅ Connected to Conflux eSpace Testnet (Chain ID: 71)
+2026-02-03 11:24:06,543 - INFO - ✅ Database initialized
+2026-02-03 11:24:06,554 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:3000
+ * Running on http://198.55.109.102:3000
+2026-02-03 11:24:06,555 - INFO - [33mPress CTRL+C to quit[0m
+2026-02-03 11:24:06,555 - INFO -  * Restarting with stat
+2026-02-03 11:24:07,080 - DEBUG - Session cached: https://evmtestnet.confluxrpc.com, <requests.sessions.Session object at 0x7ef0a6de4170>
+2026-02-03 11:24:07,081 - DEBUG - Making request HTTP. URI: https://evmtestnet.confluxrpc.com, Method: web3_clientVersion
+2026-02-03 11:24:07,082 - DEBUG - Starting new HTTPS connection (1): evmtestnet.confluxrpc.com:443
+2026-02-03 11:24:07,756 - DEBUG - https://evmtestnet.confluxrpc.com:443 "POST / HTTP/1.1" 200 114
+2026-02-03 11:24:07,757 - DEBUG - Getting response HTTP. URI: https://evmtestnet.confluxrpc.com, Method: web3_clientVersion, Response: {'jsonrpc': '2.0', 'id': 0, 'result': 'conflux-rust/v3.0.1-testnet-fix-08d6f3b-20250811/x86_64-linux-gnu/rustc1.86.0'}
+2026-02-03 11:24:07,758 - DEBUG - Making request. Method: eth_chainId
+2026-02-03 11:24:07,760 - DEBUG - Making request HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_chainId
+2026-02-03 11:24:07,953 - DEBUG - https://evmtestnet.confluxrpc.com:443 "POST / HTTP/1.1" 200 41
+2026-02-03 11:24:07,954 - DEBUG - Getting response HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_chainId, Response: {'jsonrpc': '2.0', 'id': 1, 'result': '0x47'}
+2026-02-03 11:24:07,955 - INFO - ✅ Connected to Conflux eSpace Testnet (Chain ID: 71)
+2026-02-03 11:24:07,956 - INFO - ✅ Database initialized
+2026-02-03 11:24:07,968 - WARNING -  * Debugger is active!
+2026-02-03 11:24:07,970 - INFO -  * Debugger PIN: 930-754-416
+2026-02-03 11:34:58,443 - INFO - 23.106.133.230 - - [03/Feb/2026 11:34:58] "GET /server-status HTTP/1.1" 200 -
+2026-02-03 11:34:59,198 - DEBUG - Making request HTTP. URI: https://evmtestnet.confluxrpc.com, Method: web3_clientVersion
+2026-02-03 11:34:59,199 - DEBUG - Session cached: https://evmtestnet.confluxrpc.com, <requests.sessions.Session object at 0x7ef0a6b0b860>
+2026-02-03 11:34:59,201 - DEBUG - Starting new HTTPS connection (1): evmtestnet.confluxrpc.com:443
+2026-02-03 11:35:00,023 - DEBUG - https://evmtestnet.confluxrpc.com:443 "POST / HTTP/1.1" 200 114
+2026-02-03 11:35:00,024 - DEBUG - Getting response HTTP. URI: https://evmtestnet.confluxrpc.com, Method: web3_clientVersion, Response: {'jsonrpc': '2.0', 'id': 2, 'result': 'conflux-rust/v3.0.1-testnet-fix-08d6f3b-20250811/x86_64-linux-gnu/rustc1.86.0'}
+2026-02-03 11:35:00,030 - DEBUG - Making request. Method: eth_call
+2026-02-03 11:35:00,030 - DEBUG - Making request. Method: eth_chainId
+2026-02-03 11:35:00,030 - DEBUG - Making request HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_chainId
+2026-02-03 11:35:00,226 - DEBUG - https://evmtestnet.confluxrpc.com:443 "POST / HTTP/1.1" 200 41
+2026-02-03 11:35:00,227 - DEBUG - Getting response HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_chainId, Response: {'jsonrpc': '2.0', 'id': 3, 'result': '0x47'}
+2026-02-03 11:35:00,228 - DEBUG - Making request HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_call
+2026-02-03 11:35:00,431 - DEBUG - https://evmtestnet.confluxrpc.com:443 "POST / HTTP/1.1" 200 103
+2026-02-03 11:35:00,432 - DEBUG - Getting response HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_call, Response: {'jsonrpc': '2.0', 'id': 4, 'result': '0x0000000000000000000000000000000000000000000000000d99a8cec7e20000'}
+2026-02-03 11:35:00,432 - DEBUG - Making request. Method: eth_chainId
+2026-02-03 11:35:00,433 - DEBUG - Making request HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_chainId
+2026-02-03 11:35:01,204 - DEBUG - https://evmtestnet.confluxrpc.com:443 "POST / HTTP/1.1" 200 41
+2026-02-03 11:35:01,205 - DEBUG - Getting response HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_chainId, Response: {'jsonrpc': '2.0', 'id': 5, 'result': '0x47'}
+2026-02-03 11:35:01,209 - INFO - 23.106.133.230 - - [03/Feb/2026 11:35:01] "GET /check-contract HTTP/1.1" 200 -
+2026-02-03 11:37:04,206 - INFO - 120.240.178.153 - - [03/Feb/2026 11:37:04] "GET /server-status HTTP/1.1" 200 -
+2026-02-03 11:37:04,904 - DEBUG - Making request HTTP. URI: https://evmtestnet.confluxrpc.com, Method: web3_clientVersion
+2026-02-03 11:37:04,906 - DEBUG - Resetting dropped connection: evmtestnet.confluxrpc.com
+2026-02-03 11:37:05,809 - DEBUG - https://evmtestnet.confluxrpc.com:443 "POST / HTTP/1.1" 200 114
+2026-02-03 11:37:05,810 - DEBUG - Getting response HTTP. URI: https://evmtestnet.confluxrpc.com, Method: web3_clientVersion, Response: {'jsonrpc': '2.0', 'id': 6, 'result': 'conflux-rust/v3.0.1-testnet-fix-08d6f3b-20250811/x86_64-linux-gnu/rustc1.86.0'}
+2026-02-03 11:37:05,813 - DEBUG - Making request. Method: eth_call
+2026-02-03 11:37:05,814 - DEBUG - Making request. Method: eth_chainId
+2026-02-03 11:37:05,814 - DEBUG - Making request HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_chainId
+2026-02-03 11:37:06,008 - DEBUG - https://evmtestnet.confluxrpc.com:443 "POST / HTTP/1.1" 200 41
+2026-02-03 11:37:06,009 - DEBUG - Getting response HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_chainId, Response: {'jsonrpc': '2.0', 'id': 7, 'result': '0x47'}
+2026-02-03 11:37:06,010 - DEBUG - Making request HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_call
+2026-02-03 11:37:06,249 - DEBUG - https://evmtestnet.confluxrpc.com:443 "POST / HTTP/1.1" 200 103
+2026-02-03 11:37:06,250 - DEBUG - Getting response HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_call, Response: {'jsonrpc': '2.0', 'id': 8, 'result': '0x0000000000000000000000000000000000000000000000000d99a8cec7e20000'}
+2026-02-03 11:37:06,250 - DEBUG - Making request. Method: eth_chainId
+2026-02-03 11:37:06,250 - DEBUG - Making request HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_chainId
+2026-02-03 11:37:06,448 - DEBUG - https://evmtestnet.confluxrpc.com:443 "POST / HTTP/1.1" 200 41
+2026-02-03 11:37:06,449 - DEBUG - Getting response HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_chainId, Response: {'jsonrpc': '2.0', 'id': 9, 'result': '0x47'}
+2026-02-03 11:37:06,452 - INFO - 120.240.178.233 - - [03/Feb/2026 11:37:06] "GET /check-contract HTTP/1.1" 200 -
+2026-02-03 11:37:26,721 - INFO - 📊 Status check: 0x0fe29fb2176477543b9c0bcaff2f4edb12d85b04
+2026-02-03 11:37:26,723 - INFO - 120.240.178.153 - - [03/Feb/2026 11:37:26] "GET /claim-status/0x0fe29fb2176477543b9c0bcaff2f4edb12d85b04 HTTP/1.1" 200 -
+2026-02-03 11:37:27,372 - INFO - 📊 Status check: 0x0fe29fb2176477543b9c0bcaff2f4edb12d85b04
+2026-02-03 11:37:27,374 - INFO - 120.240.178.153 - - [03/Feb/2026 11:37:27] "GET /claim-status/0x0fe29fb2176477543b9c0bcaff2f4edb12d85b04 HTTP/1.1" 200 -
+2026-02-03 11:37:38,312 - INFO - 120.240.178.233 - - [03/Feb/2026 11:37:38] "OPTIONS /verify-ad HTTP/1.1" 200 -
+2026-02-03 11:41:16,959 - INFO - 23.106.133.230 - - [03/Feb/2026 11:41:16] "GET / HTTP/1.1" 200 -
+2026-02-03 11:41:17,868 - INFO - 23.106.133.230 - - [03/Feb/2026 11:41:17] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-02-03 11:41:17,873 - ERROR - 23.106.133.230 - - [03/Feb/2026 11:41:17] code 400, message Bad request version ('Ñ')
+2026-02-03 11:41:17,874 - INFO - 23.106.133.230 - - [03/Feb/2026 11:41:17] "[31m[1m\x16\x03\x01\x07\x16\x01\x00\x07\x12\x03\x039\x18£\x9dº\x1c{à\x8e-ò×\x14¤pEÆ®ñ¬.\x126\x8a±1ë\x01\x01Ö´> \x94\x80ÀJo\x11.öF\x96MQ/2Ø6sáÚ¿S#Ã\x96J?\x03­%º§]\x00 \x1a\x1a\x13\x01\x13\x02\x13\x03À+À/À,À0Ì©Ì¨À\x13À\x14\x00\x9c\x00\x9d\x00/\x005\x01\x00\x06©ZZ\x00\x00\x00-\x00\x02\x01\x01\x00\x0d\x00\x12\x00\x10\x04\x03\x08\x04\x04\x01\x05\x03\x08\x05\x05\x01\x08\x06\x06\x01þ\x0d\x01\x1a\x00\x00\x01\x00\x01(\x00 L1¥\x00x]ß\x17z\x05?\x88³2>\x9e1õ©Sº\x8cKo\x03¯\x80Þ,\x00\x9eq\x00ðXü ÖP±\x87ß\x88ö\x1a\x1dcRßT¬¤ºQ,\x06áâ\x98dêHõ*\x02&[õÖ"øÙ\x82\x1aõ¨ì·\x7fºåm¸îÏï"ì9´&üñTõ\x09G\x81à\x00\x16ïb\x10;Ð²\x17\x84ytI\x1eÑ[0m" 400 -
+2026-02-03 11:41:20,030 - ERROR - 23.106.133.230 - - [03/Feb/2026 11:41:20] code 400, message Bad request syntax ('\x16\x03\x01\x06¶\x01\x00\x06²\x03\x03óÈS-\x8b÷´H\x96¿\x1b9[Hò\x01Ø(Ó¨\x8f\x07uAÎ;tp\x12')
+2026-02-03 11:41:20,030 - INFO - 23.106.133.230 - - [03/Feb/2026 11:41:20] "[31m[1m\x16\x03\x01\x06¶\x01\x00\x06²\x03\x03óÈS-\x8b÷´H\x96¿\x1b9[Hò\x01Ø(Ó¨\x8f\x07uAÎ;tp\x12[0m" 400 -
+2026-02-03 11:49:03,246 - INFO - 📊 Status check: 0x3d4b60f1b863d48ff401e524f1bdef8a16c9d71d
+2026-02-03 11:49:03,249 - INFO - 23.106.133.230 - - [03/Feb/2026 11:49:03] "GET /claim-status/0x3d4b60f1b863d48ff401e524f1bdef8a16c9d71d HTTP/1.1" 200 -
+2026-02-03 11:49:11,595 - INFO - 23.106.133.230 - - [03/Feb/2026 11:49:11] "OPTIONS /verify-ad HTTP/1.1" 200 -
+2026-02-03 11:49:12,368 - INFO - 🔍 Verify-ad request from 23.106.133.230
+2026-02-03 11:49:12,369 - INFO - Raw wallet address received: '0x3d4b60f1b863d48ff401e524f1bdef8a16c9d71d'
+2026-02-03 11:49:12,370 - INFO - Processing address: 0x3d4b60F1B863D48fF401e524F1bdeF8A16c9d71d
+2026-02-03 11:49:12,371 - DEBUG - Making request HTTP. URI: https://evmtestnet.confluxrpc.com, Method: web3_clientVersion
+2026-02-03 11:49:12,373 - DEBUG - Resetting dropped connection: evmtestnet.confluxrpc.com
+2026-02-03 11:49:13,227 - DEBUG - https://evmtestnet.confluxrpc.com:443 "POST / HTTP/1.1" 200 115
+2026-02-03 11:49:13,228 - DEBUG - Getting response HTTP. URI: https://evmtestnet.confluxrpc.com, Method: web3_clientVersion, Response: {'jsonrpc': '2.0', 'id': 10, 'result': 'conflux-rust/v3.0.1-testnet-fix-08d6f3b-20250811/x86_64-linux-gnu/rustc1.86.0'}
+2026-02-03 11:49:13,235 - DEBUG - Making request. Method: eth_call
+2026-02-03 11:49:13,235 - DEBUG - Making request. Method: eth_chainId
+2026-02-03 11:49:13,235 - DEBUG - Making request HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_chainId
+2026-02-03 11:49:13,432 - DEBUG - https://evmtestnet.confluxrpc.com:443 "POST / HTTP/1.1" 200 42
+2026-02-03 11:49:13,433 - DEBUG - Getting response HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_chainId, Response: {'jsonrpc': '2.0', 'id': 11, 'result': '0x47'}
+2026-02-03 11:49:13,435 - DEBUG - Making request HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_call
+2026-02-03 11:49:14,331 - DEBUG - https://evmtestnet.confluxrpc.com:443 "POST / HTTP/1.1" 200 104
+2026-02-03 11:49:14,333 - DEBUG - Getting response HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_call, Response: {'jsonrpc': '2.0', 'id': 12, 'result': '0x0000000000000000000000000000000000000000000000000000000000000000'}
+2026-02-03 11:49:14,333 - DEBUG - Making request. Method: eth_chainId
+2026-02-03 11:49:14,333 - DEBUG - Making request HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_chainId
+2026-02-03 11:49:14,519 - DEBUG - https://evmtestnet.confluxrpc.com:443 "POST / HTTP/1.1" 200 42
+2026-02-03 11:49:14,520 - DEBUG - Getting response HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_chainId, Response: {'jsonrpc': '2.0', 'id': 13, 'result': '0x47'}
+2026-02-03 11:49:14,522 - INFO - Got nonce from contract: 0
+2026-02-03 11:49:14,527 - INFO - Step 1 - Generated message hash: 618d30877009d8322bfdddac321a07940bc235a8093924b03a61899d211d95c4
+2026-02-03 11:49:14,527 - INFO - Parameters - Address: 0x3d4b60F1B863D48fF401e524F1bdeF8A16c9d71d, Nonce: 0, Deadline: 1770122954
+2026-02-03 11:49:14,527 - INFO - Step 2 - Message to sign (with prefix): 618d30877009d8322bfdddac321a07940bc235a8093924b03a61899d211d95c4
+2026-02-03 11:49:14,535 - INFO - Step 3 - Generated signature (65 bytes): 0x11a6afc3866552d95043678e7830a76f3b7df106b392b1391b5f060e8f93e22e3adae79573af766a7fd090159fed6aa1a0f5551243d5a2d0374d74fe3441879c1c
+2026-02-03 11:49:14,535 - INFO - Signature length: 132 characters
+2026-02-03 11:49:14,535 - INFO - Nonce: 0, Deadline: 1770122954
+2026-02-03 11:49:14,535 - INFO - Recovered address: 0xA6de493773af05e800753904E02262880B3186c9, Expected: 0xA6de493773af05e800753904E02262880B3186c9
+2026-02-03 11:49:14,536 - INFO - ✅ Signature generated for 0x3d4b60F1B863D48fF401e524F1bdeF8A16c9d71d
+2026-02-03 11:49:14,537 - INFO - 23.106.133.230 - - [03/Feb/2026 11:49:14] "POST /verify-ad HTTP/1.1" 200 -
+2026-02-03 11:49:22,108 - INFO - 23.106.133.230 - - [03/Feb/2026 11:49:22] "OPTIONS /relay-claim HTTP/1.1" 200 -
+2026-02-03 11:49:22,852 - INFO - 🚀 Relay claim request from 23.106.133.230
+2026-02-03 11:49:22,854 - DEBUG - Making request HTTP. URI: https://evmtestnet.confluxrpc.com, Method: web3_clientVersion
+2026-02-03 11:49:23,051 - DEBUG - https://evmtestnet.confluxrpc.com:443 "POST / HTTP/1.1" 200 115
+2026-02-03 11:49:23,052 - DEBUG - Getting response HTTP. URI: https://evmtestnet.confluxrpc.com, Method: web3_clientVersion, Response: {'jsonrpc': '2.0', 'id': 14, 'result': 'conflux-rust/v3.0.1-testnet-fix-08d6f3b-20250811/x86_64-linux-gnu/rustc1.86.0'}
+2026-02-03 11:49:23,066 - DEBUG - Making request. Method: eth_getTransactionCount
+2026-02-03 11:49:23,067 - DEBUG - Making request HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_getTransactionCount
+2026-02-03 11:49:23,261 - DEBUG - https://evmtestnet.confluxrpc.com:443 "POST / HTTP/1.1" 200 41
+2026-02-03 11:49:23,262 - DEBUG - Getting response HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_getTransactionCount, Response: {'jsonrpc': '2.0', 'id': 15, 'result': '0x4'}
+2026-02-03 11:49:23,273 - DEBUG - Making request. Method: eth_estimateGas
+2026-02-03 11:49:23,274 - DEBUG - Making request. Method: eth_chainId
+2026-02-03 11:49:23,275 - DEBUG - Making request HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_chainId
+2026-02-03 11:49:24,125 - DEBUG - https://evmtestnet.confluxrpc.com:443 "POST / HTTP/1.1" 200 42
+2026-02-03 11:49:24,126 - DEBUG - Getting response HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_chainId, Response: {'jsonrpc': '2.0', 'id': 16, 'result': '0x47'}
+2026-02-03 11:49:24,129 - DEBUG - Making request HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_estimateGas
+2026-02-03 11:49:24,540 - DEBUG - https://evmtestnet.confluxrpc.com:443 "POST / HTTP/1.1" 200 45
+2026-02-03 11:49:24,542 - DEBUG - Getting response HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_estimateGas, Response: {'jsonrpc': '2.0', 'id': 17, 'result': '0x32a94'}
+2026-02-03 11:49:24,542 - DEBUG - Making request. Method: eth_chainId
+2026-02-03 11:49:24,543 - DEBUG - Making request HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_chainId
+2026-02-03 11:49:24,725 - DEBUG - https://evmtestnet.confluxrpc.com:443 "POST / HTTP/1.1" 200 42
+2026-02-03 11:49:24,726 - DEBUG - Getting response HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_chainId, Response: {'jsonrpc': '2.0', 'id': 18, 'result': '0x47'}
+2026-02-03 11:49:24,727 - INFO - Gas estimate: 207508, Using gas limit: 311262
+2026-02-03 11:49:24,728 - DEBUG - Making request. Method: eth_gasPrice
+2026-02-03 11:49:24,728 - DEBUG - Making request HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_gasPrice
+2026-02-03 11:49:24,911 - DEBUG - https://evmtestnet.confluxrpc.com:443 "POST / HTTP/1.1" 200 49
+2026-02-03 11:49:24,912 - DEBUG - Getting response HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_gasPrice, Response: {'jsonrpc': '2.0', 'id': 19, 'result': '0x4a817c800'}
+2026-02-03 11:49:24,912 - INFO - Current gas price: 20000000000
+2026-02-03 11:49:24,915 - INFO - Transaction built
+2026-02-03 11:49:24,925 - DEBUG - Making request. Method: eth_sendRawTransaction
+2026-02-03 11:49:24,926 - DEBUG - Making request HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_sendRawTransaction
+2026-02-03 11:49:25,115 - DEBUG - https://evmtestnet.confluxrpc.com:443 "POST / HTTP/1.1" 200 104
+2026-02-03 11:49:25,116 - DEBUG - Getting response HTTP. URI: https://evmtestnet.confluxrpc.com, Method: eth_sendRawTransaction, Response: {'jsonrpc': '2.0', 'id': 20, 'result': '0xa3de7fc101a7e32f9712bad86a4092b89e5e1529ed76b16557bcc18a04361419'}
+2026-02-03 11:49:25,117 - INFO - ✅ Transaction sent: a3de7fc101a7e32f9712bad86a4092b89e5e1529ed76b16557bcc18a04361419
+2026-02-03 11:49:25,120 - INFO - 23.106.133.230 - - [03/Feb/2026 11:49:25] "POST /relay-claim HTTP/1.1" 200 -
+2026-02-03 11:49:28,816 - INFO - 📊 Status check: 0x3d4b60f1b863d48ff401e524f1bdef8a16c9d71d
+2026-02-03 11:49:28,819 - INFO - 23.106.133.230 - - [03/Feb/2026 11:49:28] "GET /claim-status/0x3d4b60f1b863d48ff401e524f1bdef8a16c9d71d HTTP/1.1" 200 -
+2026-02-03 11:50:28,734 - INFO - 📊 Status check: 0x3d4b60f1b863d48ff401e524f1bdef8a16c9d71d
+2026-02-03 11:50:28,738 - INFO - 23.106.133.230 - - [03/Feb/2026 11:50:28] "GET /claim-status/0x3d4b60f1b863d48ff401e524f1bdef8a16c9d71d HTTP/1.1" 200 -
+2026-02-03 12:09:14,317 - INFO - 📊 Status check: 0x3d4b60f1b863d48ff401e524f1bdef8a16c9d71d
+2026-02-03 12:09:14,320 - INFO - 23.106.133.230 - - [03/Feb/2026 12:09:14] "GET /claim-status/0x3d4b60f1b863d48ff401e524f1bdef8a16c9d71d HTTP/1.1" 200 -
+2026-02-03 12:56:45,400 - INFO - 185.242.3.122 - - [03/Feb/2026 12:56:45] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-03 12:56:46,016 - INFO - 185.242.3.122 - - [03/Feb/2026 12:56:46] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-03 14:07:08,534 - INFO - 68.183.8.140 - - [03/Feb/2026 14:07:08] "[33mGET /.env HTTP/1.1[0m" 404 -
+2026-02-03 14:07:08,822 - INFO - 68.183.8.140 - - [03/Feb/2026 14:07:08] "[33mGET /.git/config HTTP/1.1[0m" 404 -
+2026-02-03 14:20:46,407 - INFO - 165.232.94.238 - - [03/Feb/2026 14:20:46] "GET / HTTP/1.1" 200 -
+2026-02-03 14:20:46,709 - INFO - 165.232.94.238 - - [03/Feb/2026 14:20:46] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-02-03 14:43:31,833 - INFO - 77.90.185.227 - - [03/Feb/2026 14:43:31] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-03 14:43:32,554 - INFO - 77.90.185.227 - - [03/Feb/2026 14:43:32] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-03 14:44:20,998 - INFO - 185.242.3.122 - - [03/Feb/2026 14:44:20] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-03 14:44:21,517 - INFO - 185.242.3.122 - - [03/Feb/2026 14:44:21] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-03 15:27:29,185 - INFO - 193.142.147.209 - - [03/Feb/2026 15:27:29] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-03 15:39:47,332 - INFO - 74.235.122.210 - - [03/Feb/2026 15:39:47] "GET / HTTP/1.1" 200 -
+2026-02-03 15:39:47,467 - ERROR - 74.235.122.210 - - [03/Feb/2026 15:39:47] code 400, message Bad request syntax ('MGLNDD_198.55.109.102_3000')
+2026-02-03 15:39:47,468 - INFO - 74.235.122.210 - - [03/Feb/2026 15:39:47] "[31m[1mMGLNDD_198.55.109.102_3000[0m" 400 -
+2026-02-03 16:15:43,640 - INFO - 81.168.83.103 - - [03/Feb/2026 16:15:43] "[33mGET /.vscode/launch.json HTTP/1.0[0m" 404 -
+2026-02-03 18:13:49,859 - INFO - 193.142.147.209 - - [03/Feb/2026 18:13:49] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-03 18:22:48,656 - ERROR - 162.142.125.115 - - [03/Feb/2026 18:22:48] code 400, message Bad request version ('Ä\x00´õ½\x88\x8d&)(uÀÒ')
+2026-02-03 18:22:48,656 - INFO - 162.142.125.115 - - [03/Feb/2026 18:22:48] "[31m[1m\x16\x03\x01\x00î\x01\x00\x00ê\x03\x03 Fv¡ú~\x14öòe%£\x8e\x14IIüB]\x92~!`\x16\x14;×¦\x80I+o Ä\x00´õ½\x88\x8d&)(uÀÒ[0m" 400 -
+2026-02-03 18:22:51,828 - INFO - 162.142.125.115 - - [03/Feb/2026 18:22:51] "GET / HTTP/1.1" 200 -
+2026-02-03 18:22:55,411 - ERROR - 162.142.125.115 - - [03/Feb/2026 18:22:55] code 400, message Bad request version ('À\x14À')
+2026-02-03 18:22:55,411 - INFO - 162.142.125.115 - - [03/Feb/2026 18:22:55] "[31m[1m\x16\x03\x01\x00î\x01\x00\x00ê\x03\x03ÿA¸¡\x90mì/.H¬ýgõ+NK*\x04&h5\x0d\x8b$-\x1dS®i\x0ct \x13M\x9b§x\x1e\x83wÊÅL¤µ\x86 \x89\x96\x035vÏ~JÀ]&$í\x02ÏÛÚ\x00&Ì¨Ì©À/À0À+À,À\x13À\x09À\x14À[0m" 400 -
+2026-02-03 18:22:55,559 - INFO - 162.142.125.115 - - [03/Feb/2026 18:22:55] "GET / HTTP/1.1" 200 -
+2026-02-03 18:22:55,974 - ERROR - 162.142.125.115 - - [03/Feb/2026 18:22:55] code 505, message Invalid HTTP version (2.0)
+2026-02-03 18:22:55,974 - INFO - 162.142.125.115 - - [03/Feb/2026 18:22:55] "[35m[1mPRI * HTTP/2.0[0m" 505 -
+2026-02-03 18:22:56,209 - INFO - 162.142.125.115 - - [03/Feb/2026 18:22:56] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-02-03 18:23:02,334 - INFO - 162.142.125.115 - - [03/Feb/2026 18:23:02] "GET / HTTP/1.1" 200 -
+2026-02-03 18:23:11,004 - ERROR - 162.142.125.115 - - [03/Feb/2026 18:23:11] code 400, message Bad request version ('*öÕ\\\xad')
+2026-02-03 18:23:11,004 - INFO - 162.142.125.115 - - [03/Feb/2026 18:23:11] "[31m[1m\x16\x03\x01\x00î\x01\x00\x00ê\x03\x03AÎÂÏfÝ \x9cêq0ÜdhZ\x11|\x16\x88\x8f¹13\x97\x0c*öÕ\\­[0m" 400 -
+2026-02-03 18:23:11,206 - INFO - 162.142.125.115 - - [03/Feb/2026 18:23:11] "[33mGET /robots.txt HTTP/1.1[0m" 404 -
+2026-02-03 18:35:37,178 - INFO - 204.76.203.30 - - [03/Feb/2026 18:35:37] "[33mGET http://ip-api.com/json/ HTTP/1.1[0m" 404 -
+2026-02-03 18:53:26,547 - ERROR - 165.154.48.24 - - [03/Feb/2026 18:53:26] code 400, message Bad request version ('\x00\x9eÌ¨Ìª\x003\x00=\x00\x16À')
+2026-02-03 18:53:26,548 - INFO - 165.154.48.24 - - [03/Feb/2026 18:53:26] "[31m[1m\x16\x03\x01\x00ü\x01\x00\x00ø\x03\x03&Á\x1aá3\x8bÃTíÇM@ j6þó±á5åÂ\x00]¢5\x886\x92¹\x10Ó ¥¾E\x0dB¨\x17¶É\x115\x9aç\x9f\x8b\x17$@\x8fëøÊ×y\x1f×a2§\x97é\x96\x004Ì¨Ì©À/À0À+À,À\x09\x00\x9eÌ¨Ìª\x003\x00=\x00\x16À[0m" 400 -
+2026-02-03 18:53:37,148 - INFO - 165.154.48.24 - - [03/Feb/2026 18:53:37] "GET / HTTP/1.1" 200 -
+2026-02-03 18:53:37,618 - INFO - 165.154.48.24 - - [03/Feb/2026 18:53:37] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-02-03 18:53:38,016 - INFO - 165.154.48.24 - - [03/Feb/2026 18:53:38] "[33mGET /robots.txt HTTP/1.1[0m" 404 -
+2026-02-03 18:53:38,415 - INFO - 165.154.48.24 - - [03/Feb/2026 18:53:38] "[33mGET /sitemap.xml HTTP/1.1[0m" 404 -
+2026-02-03 18:53:38,864 - INFO - 165.154.48.24 - - [03/Feb/2026 18:53:38] "[33mGET /config.json HTTP/1.1[0m" 404 -
+2026-02-03 19:35:30,276 - INFO - 176.65.148.66 - - [03/Feb/2026 19:35:30] "HEAD / HTTP/1.1" 200 -
+2026-02-03 19:35:32,434 - INFO - 176.65.148.66 - - [03/Feb/2026 19:35:32] "GET / HTTP/1.1" 200 -
+2026-02-03 19:35:33,879 - INFO - 176.65.148.66 - - [03/Feb/2026 19:35:33] "[33mHEAD /_next HTTP/1.1[0m" 404 -
+2026-02-03 19:35:35,945 - INFO - 176.65.148.66 - - [03/Feb/2026 19:35:35] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-03 19:35:37,943 - INFO - 176.65.148.66 - - [03/Feb/2026 19:35:37] "[33mPOST /_next HTTP/1.1[0m" 404 -
+2026-02-03 19:37:47,584 - INFO - 193.142.147.209 - - [03/Feb/2026 19:37:47] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-03 20:39:44,984 - ERROR - 162.142.125.127 - - [03/Feb/2026 20:39:44] code 400, message Bad HTTP/0.9 request type ('\x16\x03\x01\x00î\x01\x00\x00ê\x03\x03å')
+2026-02-03 20:39:44,984 - INFO - 162.142.125.127 - - [03/Feb/2026 20:39:44] "[31m[1m\x16\x03\x01\x00î\x01\x00\x00ê\x03\x03å\x85FtI[0m" 400 -
+2026-02-03 20:39:48,983 - INFO - 162.142.125.127 - - [03/Feb/2026 20:39:48] "GET / HTTP/1.1" 200 -
+2026-02-03 20:39:53,015 - ERROR - 162.142.125.127 - - [03/Feb/2026 20:39:53] code 400, message Bad request version ('À\x14À')
+2026-02-03 20:39:53,016 - INFO - 162.142.125.127 - - [03/Feb/2026 20:39:53] "[31m[1m\x16\x03\x01\x00î\x01\x00\x00ê\x03\x03\x9f'n¡I\x8d\x8dþB¢\x0cï9tP¡\x09\x94÷ú\x125\x0f\x8dÖf"\x9cÛùIv Bâ\x03\x987ýðf¤)\x9c¿\x04\x9f1\x87\x9b\x97²·ª 7bÔC]A×cµ¯\x00&Ì¨Ì©À/À0À+À,À\x13À\x09À\x14À[0m" 400 -
+2026-02-03 20:39:53,726 - INFO - 162.142.125.127 - - [03/Feb/2026 20:39:53] "GET / HTTP/1.1" 200 -
+2026-02-03 20:39:54,488 - ERROR - 162.142.125.127 - - [03/Feb/2026 20:39:54] code 505, message Invalid HTTP version (2.0)
+2026-02-03 20:39:54,488 - INFO - 162.142.125.127 - - [03/Feb/2026 20:39:54] "[35m[1mPRI * HTTP/2.0[0m" 505 -
+2026-02-03 20:39:56,112 - INFO - 162.142.125.127 - - [03/Feb/2026 20:39:56] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-02-03 20:40:01,844 - INFO - 162.142.125.127 - - [03/Feb/2026 20:40:01] "GET / HTTP/1.1" 200 -
+2026-02-03 20:40:10,340 - ERROR - 162.142.125.127 - - [03/Feb/2026 20:40:10] code 400, message Bad request version ('À\x14À')
+2026-02-03 20:40:10,340 - INFO - 162.142.125.127 - - [03/Feb/2026 20:40:10] "[31m[1m\x16\x03\x01\x00î\x01\x00\x00ê\x03\x03û\x17à)µ§\x8aD$\x00\x96£3Bñ\x8b\x1e)3\x8fr\x13Gf2\x98Â]Ó\x086\x93 ú\x951\x04\x84Çã\x1eö\x91Aó\x1f\x88Tê\x00\x1eMzÙWÂ\x03\x1d\x9dï±t-\x1fk\x00&Ì¨Ì©À/À0À+À,À\x13À\x09À\x14À[0m" 400 -
+2026-02-03 20:40:11,730 - INFO - 162.142.125.127 - - [03/Feb/2026 20:40:11] "[33mGET /robots.txt HTTP/1.1[0m" 404 -
+2026-02-03 21:15:35,222 - INFO - 193.142.147.209 - - [03/Feb/2026 21:15:35] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-03 21:48:47,259 - INFO - 205.210.31.194 - - [03/Feb/2026 21:48:47] "GET / HTTP/1.1" 200 -
+2026-02-03 22:18:37,130 - INFO - 77.90.185.227 - - [03/Feb/2026 22:18:37] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-03 22:18:38,100 - INFO - 77.90.185.227 - - [03/Feb/2026 22:18:38] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-03 22:40:08,309 - INFO - 193.142.147.209 - - [03/Feb/2026 22:40:08] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-03 23:26:32,401 - ERROR - 79.124.40.174 - - [03/Feb/2026 23:26:32] code 400, message Bad request syntax ('\x02\x01\x00\x00\x00\x00\x00\x06build')
+2026-02-03 23:26:32,402 - INFO - 79.124.40.174 - - [03/Feb/2026 23:26:32] "[31m[1m\x02\x01\x00\x00\x00\x00\x00\x06build[0m" 400 -
+2026-02-03 23:26:32,745 - ERROR - 79.124.40.174 - - [03/Feb/2026 23:26:32] code 400, message Bad request syntax ('\x02\x01\x00\x00\x00\x00\x00\x06build')
+2026-02-03 23:26:32,745 - INFO - 79.124.40.174 - - [03/Feb/2026 23:26:32] "[31m[1m\x02\x01\x00\x00\x00\x00\x00\x06build[0m" 400 -
+2026-02-03 23:52:24,058 - ERROR - 199.45.155.69 - - [03/Feb/2026 23:52:24] code 400, message Bad HTTP/0.9 request type ('\x16\x03\x01\x00î\x01\x00\x00ê\x03\x03³/À_Äñ×8Û')
+2026-02-03 23:52:24,058 - INFO - 199.45.155.69 - - [03/Feb/2026 23:52:24] "[31m[1m\x16\x03\x01\x00î\x01\x00\x00ê\x03\x03³/À_Äñ×8Û\x0dáÂstòÕå\x88»Å¶/µ\x8bÞº$\x1a[0m" 400 -
+2026-02-03 23:52:27,675 - INFO - 199.45.155.69 - - [03/Feb/2026 23:52:27] "GET / HTTP/1.1" 200 -
+2026-02-03 23:52:31,669 - ERROR - 199.45.155.69 - - [03/Feb/2026 23:52:31] code 400, message Bad request syntax ('\x16\x03\x01\x00î\x01\x00\x00ê\x03\x03\x8f\x17ä¢')
+2026-02-03 23:52:31,669 - INFO - 199.45.155.69 - - [03/Feb/2026 23:52:31] "[31m[1m\x16\x03\x01\x00î\x01\x00\x00ê\x03\x03\x8f\x17ä¢[0m" 400 -
+2026-02-03 23:52:32,357 - INFO - 199.45.155.69 - - [03/Feb/2026 23:52:32] "GET / HTTP/1.1" 200 -
+2026-02-03 23:52:32,886 - ERROR - 199.45.155.69 - - [03/Feb/2026 23:52:32] code 505, message Invalid HTTP version (2.0)
+2026-02-03 23:52:32,886 - INFO - 199.45.155.69 - - [03/Feb/2026 23:52:32] "[35m[1mPRI * HTTP/2.0[0m" 505 -
+2026-02-03 23:52:36,157 - INFO - 199.45.155.69 - - [03/Feb/2026 23:52:36] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-02-03 23:52:40,610 - INFO - 199.45.155.69 - - [03/Feb/2026 23:52:40] "GET / HTTP/1.1" 200 -
+2026-02-03 23:52:47,555 - ERROR - 199.45.155.69 - - [03/Feb/2026 23:52:47] code 400, message Bad request version ('À\x14À')
+2026-02-03 23:52:47,555 - INFO - 199.45.155.69 - - [03/Feb/2026 23:52:47] "[31m[1m\x16\x03\x01\x00î\x01\x00\x00ê\x03\x03Ü"?\x8aé')©\x85*¬}\x95¿äKSPML\x96\x8dØ\x91Ù¾\x1cx+E\x84w \\éIñäb+Ã!]gQDX(\x11ªb¿ë\x01Â^å/pÎÊò]\x1f\x13\x00&Ì¨Ì©À/À0À+À,À\x13À\x09À\x14À[0m" 400 -
+2026-02-03 23:52:48,042 - INFO - 199.45.155.69 - - [03/Feb/2026 23:52:48] "[33mGET /.well-known/security.txt HTTP/1.1[0m" 404 -
+2026-02-04 00:15:07,472 - INFO - 66.228.53.46 - - [04/Feb/2026 00:15:07] "GET / HTTP/1.1" 200 -
+2026-02-04 00:38:14,385 - INFO - 77.90.185.76 - - [04/Feb/2026 00:38:14] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-04 00:38:15,095 - INFO - 77.90.185.76 - - [04/Feb/2026 00:38:15] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-04 00:41:21,649 - ERROR - 66.132.153.137 - - [04/Feb/2026 00:41:21] code 400, message Bad request syntax ('\x16\x03\x01\x00î\x01\x00\x00ê\x03\x03\x8a4±ã@¯')
+2026-02-04 00:41:21,650 - INFO - 66.132.153.137 - - [04/Feb/2026 00:41:21] "[31m[1m\x16\x03\x01\x00î\x01\x00\x00ê\x03\x03\x8a4±ã@¯[0m" 400 -
+2026-02-04 00:41:24,769 - INFO - 66.132.153.137 - - [04/Feb/2026 00:41:24] "GET / HTTP/1.1" 200 -
+2026-02-04 00:41:28,096 - ERROR - 66.132.153.137 - - [04/Feb/2026 00:41:28] code 400, message Bad request version ('À\x14À')
+2026-02-04 00:41:28,097 - INFO - 66.132.153.137 - - [04/Feb/2026 00:41:28] "[31m[1m\x16\x03\x01\x00î\x01\x00\x00ê\x03\x03Ø\x16&êyï¦rôÆ\x09àGÝk-gc¨q+H!\x04÷g0(\x1aê?È Êº \x18½¨¿w)f:\x88\x88ÈB"í\x05%\x0c\x8de\x12MWß}\x0cÂ#K\x0f\x00&Ì¨Ì©À/À0À+À,À\x13À\x09À\x14À[0m" 400 -
+2026-02-04 00:41:28,342 - INFO - 66.132.153.137 - - [04/Feb/2026 00:41:28] "GET / HTTP/1.1" 200 -
+2026-02-04 00:41:28,461 - ERROR - 66.132.153.137 - - [04/Feb/2026 00:41:28] code 505, message Invalid HTTP version (2.0)
+2026-02-04 00:41:28,461 - INFO - 66.132.153.137 - - [04/Feb/2026 00:41:28] "[35m[1mPRI * HTTP/2.0[0m" 505 -
+2026-02-04 00:41:28,658 - INFO - 66.132.153.137 - - [04/Feb/2026 00:41:28] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-02-04 00:41:32,254 - INFO - 66.132.153.137 - - [04/Feb/2026 00:41:32] "GET / HTTP/1.1" 200 -
+2026-02-04 00:41:40,044 - ERROR - 66.132.153.137 - - [04/Feb/2026 00:41:40] code 400, message Bad request version ('À\x14À')
+2026-02-04 00:41:40,045 - INFO - 66.132.153.137 - - [04/Feb/2026 00:41:40] "[31m[1m\x16\x03\x01\x00î\x01\x00\x00ê\x03\x03\x04\x94Õ@O0ó\x802Ë6éëï.`©ñ\x9cP<²³ÈÍ¦I)\x99\x84Üg ÙùnÖÐËâ¥@Ù\x88Î\x0cyõ[üì¯I¶þ\x1a@S;A5Î\x02[_\x00&Ì¨Ì©À/À0À+À,À\x13À\x09À\x14À[0m" 400 -
+2026-02-04 00:41:40,152 - INFO - 66.132.153.137 - - [04/Feb/2026 00:41:40] "[33mGET /security.txt HTTP/1.1[0m" 404 -
+2026-02-04 00:58:26,802 - INFO - 193.142.147.209 - - [04/Feb/2026 00:58:26] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-04 01:01:44,613 - INFO - 74.82.47.5 - - [04/Feb/2026 01:01:44] "GET / HTTP/1.1" 200 -
+2026-02-04 02:21:17,445 - INFO - 193.142.147.209 - - [04/Feb/2026 02:21:17] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-04 02:47:38,795 - INFO - 54.147.154.147 - - [04/Feb/2026 02:47:38] "GET / HTTP/1.1" 200 -
+2026-02-04 02:56:36,624 - ERROR - 91.230.168.145 - - [04/Feb/2026 02:56:36] code 400, message Bad request version ('À#À¬À®À+À')
+2026-02-04 02:56:36,625 - INFO - 91.230.168.145 - - [04/Feb/2026 02:56:36] "[31m[1m\x16\x03\x03\x01§\x01\x00\x01£\x03\x03Ä6à :C,-ì3+\x11\x93ñäÇ¼+ñ¾CÍ­\x8aÃ±9q«3 Â Ë\x0crýüJ4ë\x88Öì\x1dÑý'Qnäÿ\x83ÃôßÞ:\x88\x12\x1e\x8f]ð\x7f\x00\x8a\x00\x16\x003\x00gÀ\x9eÀ¢\x00\x9e\x009\x00kÀ\x9fÀ£\x00\x9f\x00E\x00¾\x00\x88\x00Ä\x00\x9aÀ\x08À\x09À#À¬À®À+À[0m" 400 -
+2026-02-04 02:56:39,709 - INFO - 91.230.168.71 - - [04/Feb/2026 02:56:39] "GET / HTTP/1.1" 200 -
+2026-02-04 02:58:59,128 - ERROR - 199.45.154.158 - - [04/Feb/2026 02:58:59] code 400, message Bad request version ('À\x14À')
+2026-02-04 02:58:59,129 - INFO - 199.45.154.158 - - [04/Feb/2026 02:58:59] "[31m[1m\x16\x03\x01\x00î\x01\x00\x00ê\x03\x03ñ!S\x12Òê®![\x11\x00v\x9cx±\x1a.\x13ï;ãõ¡é\\ª\x973\x18r¾C r®ôØÅ\x9e±Eêov8­=¼)\x8b!»-\x1a®y×T£)E\x1b®ÌJ\x00&Ì¨Ì©À/À0À+À,À\x13À\x09À\x14À[0m" 400 -
+2026-02-04 02:59:02,483 - INFO - 199.45.154.158 - - [04/Feb/2026 02:59:02] "GET / HTTP/1.1" 200 -
+2026-02-04 02:59:09,010 - ERROR - 199.45.154.158 - - [04/Feb/2026 02:59:09] code 400, message Bad HTTP/0.9 request type ('\x16\x03\x01\x00î\x01\x00\x00ê\x03\x03')
+2026-02-04 02:59:09,010 - INFO - 199.45.154.158 - - [04/Feb/2026 02:59:09] "[31m[1m\x16\x03\x01\x00î\x01\x00\x00ê\x03\x03\x85Â\x96\x12øOç<ÊÑ\x8fv&\x89Ä\x16È\x8cp?\x88¤g^±\x9c\x15Ò[0m" 400 -
+2026-02-04 02:59:10,096 - INFO - 199.45.154.158 - - [04/Feb/2026 02:59:10] "GET / HTTP/1.1" 200 -
+2026-02-04 02:59:10,608 - ERROR - 199.45.154.158 - - [04/Feb/2026 02:59:10] code 505, message Invalid HTTP version (2.0)
+2026-02-04 02:59:10,608 - INFO - 199.45.154.158 - - [04/Feb/2026 02:59:10] "[35m[1mPRI * HTTP/2.0[0m" 505 -
+2026-02-04 02:59:11,763 - INFO - 199.45.154.158 - - [04/Feb/2026 02:59:11] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-02-04 02:59:12,648 - INFO - 195.184.76.130 - - [04/Feb/2026 02:59:12] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-02-04 02:59:16,089 - INFO - 199.45.154.158 - - [04/Feb/2026 02:59:16] "GET / HTTP/1.1" 200 -
+2026-02-04 02:59:23,715 - ERROR - 199.45.154.158 - - [04/Feb/2026 02:59:23] code 400, message Bad request version ('À\x14À')
+2026-02-04 02:59:23,716 - INFO - 199.45.154.158 - - [04/Feb/2026 02:59:23] "[31m[1m\x16\x03\x01\x00î\x01\x00\x00ê\x03\x03g[\x9dÎªX?l@Ál~\x9e¸lØdÕ\x9b\x00¥\x02=H\x8cJ*s-\x0bð¶ ³Ò0©\x17Îv\x7fd\x8dÅ\x9aÅÃ£ni§s\x8c\x97\x93GÈ\x0e\x91â3Ðq\x10H\x00&Ì¨Ì©À/À0À+À,À\x13À\x09À\x14À[0m" 400 -
+2026-02-04 02:59:24,030 - INFO - 199.45.154.158 - - [04/Feb/2026 02:59:24] "[33mGET /wiki HTTP/1.1[0m" 404 -
+2026-02-04 03:44:09,634 - INFO - 77.90.185.76 - - [04/Feb/2026 03:44:09] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-04 03:44:10,165 - INFO - 77.90.185.76 - - [04/Feb/2026 03:44:10] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-04 03:53:58,800 - INFO - 77.90.185.227 - - [04/Feb/2026 03:53:58] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-04 03:53:59,501 - INFO - 77.90.185.227 - - [04/Feb/2026 03:53:59] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-04 03:54:56,569 - INFO - 193.142.147.209 - - [04/Feb/2026 03:54:56] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-04 04:24:11,237 - INFO - 185.242.3.123 - - [04/Feb/2026 04:24:11] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-04 04:24:12,779 - INFO - 185.242.3.123 - - [04/Feb/2026 04:24:12] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-04 05:38:35,746 - INFO - 147.185.132.231 - - [04/Feb/2026 05:38:35] "GET / HTTP/1.0" 200 -
+2026-02-04 06:44:40,526 - INFO - 193.142.147.209 - - [04/Feb/2026 06:44:40] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-04 06:55:11,452 - INFO - 193.26.115.178 - - [04/Feb/2026 06:55:11] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-04 07:02:44,162 - INFO - 193.26.115.178 - - [04/Feb/2026 07:02:44] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-04 08:27:16,246 - INFO - 193.142.147.209 - - [04/Feb/2026 08:27:16] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-04 09:24:43,486 - INFO - 77.90.185.227 - - [04/Feb/2026 09:24:43] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-04 09:24:44,174 - INFO - 77.90.185.227 - - [04/Feb/2026 09:24:44] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-04 09:31:21,709 - ERROR - 184.105.247.254 - - [04/Feb/2026 09:31:21] code 400, message Bad request version ('À\x14À')
+2026-02-04 09:31:21,710 - INFO - 184.105.247.254 - - [04/Feb/2026 09:31:21] "[31m[1m\x16\x03\x01\x00{\x01\x00\x00w\x03\x03¬\x19\x1cû©X~Ú_8Öîþ\x91\x00iT¤\x18\x00F%\x0f8}\\Ü5jú¹\x1e\x00\x00\x1aÀ/À+À\x11À\x07À\x13À\x09À\x14À[0m" 400 -
+2026-02-04 09:46:38,268 - INFO - 193.142.147.209 - - [04/Feb/2026 09:46:38] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-04 11:16:39,272 - INFO - 193.142.147.209 - - [04/Feb/2026 11:16:39] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-04 12:31:58,687 - INFO - 193.142.147.209 - - [04/Feb/2026 12:31:58] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-04 13:05:49,214 - INFO - 176.65.148.38 - - [04/Feb/2026 13:05:49] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-04 14:16:54,163 - INFO - 193.142.147.209 - - [04/Feb/2026 14:16:54] "[31m[1mPOST / HTTP/1.1[0m" 405 -
+2026-02-04 14:31:00,178 - INFO - 200.9.154.79 - - [04/Feb/2026 14:31:00] "[33mCONNECT httpbin.org:443 HTTP/1.1[0m" 404 -
+2026-02-04 14:33:12,960 - INFO - 159.203.44.163 - - [04/Feb/2026 14:33:12] "[33mGET /.env HTTP/1.1[0m" 404 -
+2026-02-04 14:33:13,103 - INFO - 159.203.44.163 - - [04/Feb/2026 14:33:13] "[33mGET /.git/config HTTP/1.1[0m" 404 -
+2026-02-04 14:45:28,373 - INFO - 162.142.125.39 - - [04/Feb/2026 14:45:28] "GET / HTTP/1.1" 200 -
+2026-02-04 14:45:37,142 - ERROR - 162.142.125.39 - - [04/Feb/2026 14:45:37] code 400, message Bad request version ('À\x14À')
+2026-02-04 14:45:37,143 - INFO - 162.142.125.39 - - [04/Feb/2026 14:45:37] "[31m[1m\x16\x03\x01\x00î\x01\x00\x00ê\x03\x03ßBg\x19¢TÚ\x0d\x99S]\x19\x0f\x9eq\x88\x8fekc;X1@3Ya\x1c­9ID [\x08,Ó\x0f\x9b7K,-Ô\x19JCo\x8eð¨øð\x9f\x7fJ\x1dX**\x9a\x88°\x7f.\x00&Ì¨Ì©À/À0À+À,À\x13À\x09À\x14À[0m" 400 -
+2026-02-04 14:45:41,382 - INFO - 162.142.125.39 - - [04/Feb/2026 14:45:41] "GET / HTTP/1.1" 200 -
+2026-02-04 14:45:43,178 - ERROR - 162.142.125.39 - - [04/Feb/2026 14:45:43] code 505, message Invalid HTTP version (2.0)
+2026-02-04 14:45:43,178 - INFO - 162.142.125.39 - - [04/Feb/2026 14:45:43] "[35m[1mPRI * HTTP/2.0[0m" 505 -
+2026-02-04 14:45:47,392 - INFO - 162.142.125.39 - - [04/Feb/2026 14:45:47] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-02-04 14:45:58,506 - INFO - 162.142.125.39 - - [04/Feb/2026 14:45:58] "GET / HTTP/1.1" 200 -
+2026-02-04 14:46:17,161 - ERROR - 162.142.125.39 - - [04/Feb/2026 14:46:17] code 400, message Bad request version ('Ùb')
+2026-02-04 14:46:17,162 - INFO - 162.142.125.39 - - [04/Feb/2026 14:46:17] "[31m[1m\x16\x03\x01\x00î\x01\x00\x00ê\x03\x03\x17\x18\x98\\¸nØvèôX0³ÿ\x0cË\x96¿\x9ebUÒ\x08\x84Bï#B\x97|¥Ê ½\x0cÙb [0m" 400 -
+2026-02-04 14:46:24,203 - INFO - 162.142.125.39 - - [04/Feb/2026 14:46:24] "[33mGET /wiki HTTP/1.1[0m" 404 -

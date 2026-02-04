@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conflux eSpace Testnet Faucet (Gas-Free)</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        body { background: linear-gradient(135deg, #1a2980 0%, #26d0ce 100%); min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
+        .container { background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); width: 100%; max-width: 600px; overflow: hidden; }
+        .header { background: linear-gradient(135deg, #1a2980 0%, #26d0ce 100%); color: white; padding: 25px; text-align: center; }
+        .header h1 { font-size: 26px; margin-bottom: 8px; }
+        .header p { opacity: 0.9; font-size: 14px; }
+        .conflux-logo { font-size: 40px; margin-bottom: 10px; color: #00d4ff; }
+        .content { padding: 25px; }
+        .step { display: flex; align-items: center; margin-bottom: 20px; padding: 15px; border-radius: 12px; background: #f8fafc; border: 2px solid #e2e8f0; transition: all 0.3s; }
+        .step.active { border-color: #1a2980; background: #f1f5f9; }
+        .step.completed { border-color: #10b981; background: #f0fdf4; }
+        .step-number { width: 32px; height: 32px; background: #e2e8f0; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-right: 12px; font-weight: bold; color: #64748b; }
+        .step.active .step-number { background: #1a2980; color: white; }
+        .step.completed .step-number { background: #10b981; color: white; }
+        .step-info h3 { font-size: 15px; color: #334155; margin-bottom: 4px; }
+        .step-info p { font-size: 13px; color: #64748b; }
+        .btn { display: block; width: 100%; padding: 14px; border: none; border-radius: 12px; font-size: 15px; font-weight: 600; cursor: pointer; transition: all 0.3s; margin-bottom: 15px; }
+        .btn-primary { background: linear-gradient(135deg, #1a2980 0%, #26d0ce 100%); color: white; }
+        .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(26, 41, 128, 0.3); }
+        .btn-secondary { background: #f1f5f9; color: #475569; }
+        .btn-secondary:hover:not(:disabled) { background: #e2e8f0; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .ad-container { text-align: center; padding: 20px; background: #f8fafc; border-radius: 12px; margin: 15px 0; border: 2px dashed #cbd5e1; }
+        .ad-timer { font-size: 48px; font-weight: bold; color: #1a2980; margin: 15px 0; }
+        .status { padding: 12px; border-radius: 10px; margin: 12px 0; font-size: 13px; display: none; }
+        .status.success { background: #f0fdf4; color: #065f46; border: 1px solid #a7f3d0; display: block; }
+        .status.error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; display: block; }
+        .status.info { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; display: block; }
+        .wallet-info { display: flex; align-items: center; justify-content: space-between; padding: 12px; background: #f8fafc; border-radius: 10px; margin-bottom: 15px; }
+        .wallet-address { font-family: monospace; font-size: 13px; color: #475569; background: white; padding: 6px 10px; border-radius: 8px; border: 1px solid #e2e8f0; cursor: pointer; }
+        .claim-amount { text-align: center; font-size: 22px; font-weight: bold; color: #1a2980; margin: 15px 0; }
+        .faucet-info { background: #f8fafc; padding: 12px; border-radius: 10px; margin-top: 15px; font-size: 13px; color: #64748b; }
+        .network-info { display: inline-block; background: #1a2980; color: white; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; margin-left: 8px; }
+        .debug-info { background: #fef3c7; padding: 10px; border-radius: 8px; margin: 10px 0; font-family: monospace; font-size: 12px; }
+        .gas-free-badge { display: inline-block; background: linear-gradient(135deg, #10b981 0%, #34d399 100%); color: white; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; margin-left: 8px; }
+        .contract-info { background: #eff6ff; padding: 10px; border-radius: 8px; margin: 10px 0; font-size: 12px; }
+        .server-status { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
+        .server-online { background: #10b981; }
+        .server-offline { background: #ef4444; }
+        @media (max-width: 600px) { .container { margin: 10px; } .header { padding: 20px; } .content { padding: 20px; } .ad-timer { font-size: 36px; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="conflux-logo"><i class="fas fa-water"></i></div>
+            <h1>Conflux eSpace Faucet <span class="gas-free-badge">GAS-FREE</span></h1>
+            <p>Get 0.01 CFX test tokens - No gas fees required!</p>
+            <span class="network-info">Conflux eSpace Testnet</span>
+        </div>
+        
+        <div class="content">
+            <div id="statusMessage" class="status"></div>
+            
+            <div class="contract-info" id="contractInfo">
+                <div id="serverStatus">
+                    <span class="server-status server-offline" id="serverStatusDot"></span>
+                    <span id="serverStatusText">Checking server status...</span>
+                </div>
+                <div id="contractContent">Loading contract info...</div>
+            </div>
+            
+            <div class="wallet-info" id="walletInfo" style="display: none;">
+                <div><strong>Wallet:</strong></div>
+                <div class="wallet-address" id="walletAddress" onclick="copyToClipboard()" title="Click to copy"></div>
+            </div>
+            
+            <div class="claim-amount">0.01 CFX <span class="gas-free-badge">No Gas Fees</span></div>
+            
+            <div class="step" id="step1">
+                <div class="step-number">1</div>
+                <div class="step-info">
+                    <h3>Connect Wallet</h3>
+                    <p>Connect MetaMask to Conflux eSpace Testnet</p>
+                </div>
+            </div>
+            <button class="btn btn-primary" id="connectWalletBtn" onclick="connectWallet()">
+                <i class="fas fa-wallet"></i> Connect MetaMask
+            </button>
+            
+            <div class="step" id="step2">
+                <div class="step-number">2</div>
+                <div class="step-info">
+                    <h3>Verify Human</h3>
+                    <p>Watch a short ad to prove you're human</p>
+                </div>
+            </div>
+            <button class="btn btn-secondary" id="watchAdBtn" onclick="startAd()" disabled>
+                <i class="fas fa-play-circle"></i> Watch Ad (5s)
+            </button>
+            
+            <div class="ad-container" id="adContainer" style="display: none;">
+                <h3><i class="fas fa-ad"></i> Advertisement</h3>
+                <p>Please watch this demo ad for 5 seconds</p>
+                <div class="ad-timer" id="adTimer">5</div>
+                <p>Ad verification in progress...</p>
+            </div>
+            
+            <div class="step" id="step3">
+                <div class="step-number">3</div>
+                <div class="step-info">
+                    <h3>Claim Tokens (Gas-Free)</h3>
+                    <p>Get 0.01 CFX test tokens - No gas fees!</p>
+                </div>
+            </div>
+            <button class="btn btn-primary" id="claimBtn" onclick="claimTokens()" disabled>
+                <i class="fas fa-faucet"></i> Claim 0.01 CFX (Gas-Free)
+            </button>
+            
+            <div class="debug-info" id="debugInfo" style="display: none;">
+                <strong>Debug Info:</strong>
+                <div id="debugContent"></div>
+            </div>
+            
+            <div class="faucet-info">
+                <p><i class="fas fa-info-circle"></i> <strong>How it works:</strong> You watch an ad, we pay the gas! Each wallet can claim once every 24 hours.</p>
+                <p><i class="fas fa-exclamation-triangle"></i> <strong>Important:</strong> Make sure the contract has enough CFX! Check: <a href="https://evmtestnet.confluxscan.io/address/0x6CD9AFBCfC6cE793A4Ed3293127735B47DDD842B" target="_blank">Contract Balance</a></p>
+                <p><i class="fas fa-bolt"></i> <strong>Contract:</strong> 0x6CD9AFBCfC6cE793A4Ed3293127735B47DDD842B</p>
+                <p><i class="fas fa-server"></i> <strong>Relay Server:</strong> Pays all gas fees for you!</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.7.4/dist/web3.min.js"></script>
+    <script>
+        // 配置
+        const CONFIG = {
+            serverUrl: "http://198.55.109.102:3000",
+            contractAddress: "0x6CD9AFBCfC6cE793A4Ed3293127735B47DDD842B",
+            confluxNetwork: {
+                chainId: "0x47",
+                chainName: "Conflux eSpace Testnet",
+                nativeCurrency: { name: "CFX", symbol: "CFX", decimals: 18 },
+                rpcUrls: ["https://evmtestnet.confluxrpc.com"],
+                blockExplorerUrls: ["https://evmtestnet.confluxscan.io"]
+            }
+        };
+
+        // 全局变量
+        let userAddress = null;
+        let signature = null;
+        let nonce = null;
+        let deadline = null;
+        let adTimer = null;
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("Gas-Free Faucet loaded");
+            checkServerStatus();
+            checkWallet();
+        });
+
+        // 检查服务器状态
+        async function checkServerStatus() {
+            try {
+                const response = await fetch(`${CONFIG.serverUrl}/server-status`);
+                const data = await response.json();
+                
+                if (data.server === "online") {
+                    document.getElementById('serverStatusDot').className = "server-status server-online";
+                    document.getElementById('serverStatusText').textContent = "Server: Online";
+                    loadContractInfo();
+                } else {
+                    document.getElementById('serverStatusDot').className = "server-status server-offline";
+                    document.getElementById('serverStatusText').textContent = "Server: Offline";
+                }
+            } catch (error) {
+                console.error("Error checking server status:", error);
+                document.getElementById('serverStatusDot').className = "server-status server-offline";
+                document.getElementById('serverStatusText').textContent = "Server: Offline";
+                document.getElementById('contractContent').innerHTML = "Cannot connect to server. Please make sure the server is running.";
+                
+                // 每10秒重试一次
+                setTimeout(checkServerStatus, 10000);
+            }
+        }
+
+        // 加载合约信息
+        async function loadContractInfo() {
+            try {
+                const response = await fetch(`${CONFIG.serverUrl}/check-contract`);
+                const data = await response.json();
+                
+                if (data.contract_balance) {
+                    const contractShort = data.contract_address.substring(0, 8) + "..." + data.contract_address.substring(36);
+                    document.getElementById('contractContent').innerHTML = `
+                        Contract: ${contractShort}<br>
+                        Balance: ${data.contract_balance}<br>
+                        Remaining Claims: ~${data.approx_remaining_claims || 'Unknown'}<br>
+                        Status: ${data.rpc_connected ? 'RPC Connected' : 'RPC Disconnected'}<br>
+                        <small><i class="fas fa-external-link-alt"></i> <a href="${data.explorer_url}" target="_blank">View on Explorer</a></small>
+                    `;
+                }
+            } catch (error) {
+                console.error("Error loading contract info:", error);
+                document.getElementById('contractContent').innerHTML = "Failed to load contract info";
+            }
+        }
+
+        // 检查钱包连接
+        async function checkWallet() {
+            if (!window.ethereum) {
+                showStatus("Please install MetaMask", "error");
+                return;
+            }
+            
+            try {
+                const accounts = await ethereum.request({ method: 'eth_accounts' });
+                if (accounts.length > 0) {
+                    userAddress = accounts[0];
+                    updateWalletDisplay();
+                    checkStatus();
+                }
+            } catch (error) {
+                console.error("Check wallet error:", error);
+            }
+        }
+
+        // 连接钱包
+        async function connectWallet() {
+            if (!window.ethereum) {
+                showStatus("Install MetaMask first", "error");
+                return;
+            }
+            
+            try {
+                showStatus("Connecting...", "info");
+                
+                // 切换网络
+                await switchNetwork();
+                
+                // 获取账户
+                const accounts = await ethereum.request({ method: 'eth_requestAccounts' });
+                userAddress = accounts[0];
+                console.log("User address from MetaMask:", userAddress);
+                
+                updateWalletDisplay();
+                checkStatus();
+                
+                showStatus("Connected!", "success");
+                
+            } catch (error) {
+                console.error("Connect error:", error);
+                if (error.code === 4001) {
+                    showStatus("Connection rejected", "error");
+                } else {
+                    showStatus("Connection error: " + error.message, "error");
+                }
+            }
+        }
+
+        // 切换网络
+        async function switchNetwork() {
+            try {
+                await ethereum.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: CONFIG.confluxNetwork.chainId }]
+                });
+            } catch (error) {
+                if (error.code === 4902) {
+                    await ethereum.request({
+                        method: 'wallet_addEthereumChain',
+                        params: [CONFIG.confluxNetwork]
+                    });
+                } else {
+                    throw error;
+                }
+            }
+        }
+
+        // 更新钱包显示
+        function updateWalletDisplay() {
+            if (!userAddress) return;
+            
+            const shortAddr = userAddress.substring(0, 6) + "..." + userAddress.substring(38);
+            document.getElementById('walletAddress').textContent = shortAddr;
+            document.getElementById('walletInfo').style.display = 'flex';
+            document.getElementById('watchAdBtn').disabled = false;
+            
+            document.getElementById('step1').classList.add('completed');
+            document.getElementById('step2').classList.add('active');
+        }
+
+        // 复制地址到剪贴板
+        function copyToClipboard() {
+            if (!userAddress) return;
+            
+            navigator.clipboard.writeText(userAddress).then(() => {
+                const originalText = document.getElementById('walletAddress').textContent;
+                document.getElementById('walletAddress').textContent = "Copied!";
+                document.getElementById('walletAddress').style.color = "#10b981";
+                
+                setTimeout(() => {
+                    document.getElementById('walletAddress').textContent = originalText;
+                    document.getElementById('walletAddress').style.color = "";
+                }, 2000);
+            });
+        }
+
+        // 检查状态
+        async function checkStatus() {
+            if (!userAddress) return;
+            
+            try {
+                const response = await fetch(`${CONFIG.serverUrl}/claim-status/${userAddress}`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    console.warn("Status check error:", data.error);
+                } else if (data.can_claim === false) {
+                    const hours = data.hours_left || (data.time_left / 3600).toFixed(1);
+                    document.getElementById('watchAdBtn').disabled = true;
+                    document.getElementById('watchAdBtn').innerHTML = `<i class="fas fa-clock"></i> Wait ${hours}h`;
+                    document.getElementById('claimBtn').disabled = true;
+                    document.getElementById('claimBtn').innerHTML = `<i class="fas fa-clock"></i> Available in ${hours}h`;
+                    showStatus(`Next claim in ${hours} hours`, "info");
+                    
+                    // 更新步骤显示
+                    document.getElementById('step2').classList.remove('active');
+                    document.getElementById('step2').classList.add('completed');
+                    document.getElementById('step3').classList.add('active');
+                }
+            } catch (error) {
+                console.error("Status check error:", error);
+            }
+        }
+
+        // 开始广告
+        function startAd() {
+            document.getElementById('adContainer').style.display = 'block';
+            document.getElementById('watchAdBtn').disabled = true;
+            document.getElementById('watchAdBtn').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Watching...';
+            
+            let seconds = 5;
+            document.getElementById('adTimer').textContent = seconds;
+            
+            adTimer = setInterval(() => {
+                seconds--;
+                document.getElementById('adTimer').textContent = seconds;
+                
+                if (seconds <= 0) {
+                    clearInterval(adTimer);
+                    finishAd();
+                }
+            }, 1000);
+            
+            showStatus("Watching ad...", "info");
+        }
+
+        // 完成广告
+        async function finishAd() {
+            try {
+                showStatus("Getting signature...", "info");
+                
+                console.log("Sending wallet address to server:", userAddress);
+                
+                const response = await fetch(`${CONFIG.serverUrl}/verify-ad`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        wallet: userAddress,
+                        adToken: "demo_ad_ok"
+                    })
+                });
+                
+                const data = await response.json();
+                console.log("Signature response:", data);
+                
+                if (data.success) {
+                    signature = data.signature;
+                    nonce = data.nonce;
+                    deadline = data.deadline;
+                    
+                    // 确保签名有0x前缀
+                    if (!signature.startsWith('0x')) {
+                        signature = '0x' + signature;
+                        console.log("Added 0x prefix to signature");
+                    }
+                    
+                    console.log("Full signature:", signature);
+                    console.log("Signature length:", signature.length);
+                    console.log("Nonce:", nonce);
+                    console.log("Deadline:", deadline);
+                    
+                    // 显示调试信息
+                    document.getElementById('debugInfo').style.display = 'block';
+                    const deadlineDate = new Date(deadline * 1000).toLocaleString();
+                    document.getElementById('debugContent').innerHTML = `
+                        Signature: ${signature.substring(0, 30)}...<br>
+                        Length: ${signature.length} characters<br>
+                        Nonce: ${nonce}<br>
+                        Deadline: ${deadlineDate}<br>
+                        Wallet: ${userAddress}<br>
+                        Signer: ${data.signer}<br>
+                        Relayer: ${data.relayer}<br>
+                        Contract: ${data.contract}
+                    `;
+                    
+                    document.getElementById('adContainer').innerHTML = `
+                        <div style="color:#10b981;">
+                            <i class="fas fa-check-circle" style="font-size:40px;"></i>
+                            <h3>Ready! (Gas-Free)</h3>
+                            <p>Signature received - No gas fee required!</p>
+                        </div>
+                    `;
+                    
+                    document.getElementById('watchAdBtn').innerHTML = '<i class="fas fa-check"></i> Ad Completed';
+                    document.getElementById('claimBtn').disabled = false;
+                    document.getElementById('claimBtn').innerHTML = '<i class="fas fa-faucet"></i> Claim 0.01 CFX (Gas-Free)';
+                    
+                    document.getElementById('step2').classList.remove('active');
+                    document.getElementById('step2').classList.add('completed');
+                    document.getElementById('step3').classList.add('active');
+                    
+                    showStatus("Ready to claim! No gas fee required.", "success");
+                    
+                } else {
+                    console.error("Server error:", data.error);
+                    showStatus("Error: " + data.error, "error");
+                    document.getElementById('watchAdBtn').disabled = false;
+                    document.getElementById('watchAdBtn').innerHTML = '<i class="fas fa-play-circle"></i> Try Again';
+                }
+                
+            } catch (error) {
+                console.error("Finish ad error:", error);
+                showStatus("Server error: " + error.message, "error");
+                document.getElementById('watchAdBtn').disabled = false;
+                document.getElementById('watchAdBtn').innerHTML = '<i class="fas fa-play-circle"></i> Try Again';
+            }
+        }
+
+        // 领取代币 - Gas-Free版本
+        async function claimTokens() {
+            if (!signature || nonce === null || deadline === null) {
+                showStatus("No signature or missing data", "error");
+                return;
+            }
+            
+            const claimBtn = document.getElementById('claimBtn');
+            claimBtn.disabled = true;
+            claimBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+            
+            try {
+                showStatus("Sending transaction via relay (gas-free)...", "info");
+                
+                console.log("Sending to relay server:", {
+                    wallet: userAddress,
+                    signature: signature.substring(0, 30) + "...",
+                    nonce: nonce,
+                    deadline: deadline
+                });
+        
+                // 调用relay端点
+                const response = await fetch(`${CONFIG.serverUrl}/relay-claim`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        wallet: userAddress,
+                        signature: signature,
+                        nonce: nonce,
+                        deadline: deadline
+                    })
+                });
+                
+                const data = await response.json();
+                console.log("Relay response:", data);
+                
+                if (data.success) {
+                    // 成功
+                    claimBtn.innerHTML = '<i class="fas fa-check"></i> Success!';
+                    claimBtn.style.background = '#10b981';
+                    
+                    const explorerUrl = data.explorer_url || `https://evmtestnet.confluxscan.io/tx/${data.tx_hash}`;
+                    showStatus(`
+                        <strong>Success!</strong> Gas-free transaction submitted.<br>
+                        <a href="${explorerUrl}" target="_blank" style="color:#1a2980;text-decoration:underline;">
+                            View transaction on ConfluxScan
+                        </a><br>
+                        Transaction Hash: ${data.tx_hash.substring(0, 20)}...<br>
+                        <small>It may take a few minutes to confirm.</small>
+                    `, "success");
+                    
+                    // 禁用按钮，24小时内不能再领取
+                    document.getElementById('watchAdBtn').disabled = true;
+                    document.getElementById('watchAdBtn').innerHTML = '<i class="fas fa-clock"></i> 24h Wait';
+                    document.getElementById('claimBtn').disabled = true;
+                    document.getElementById('claimBtn').innerHTML = '<i class="fas fa-check"></i> Claimed (24h Wait)';
+                    
+                    // 更新状态
+                    setTimeout(() => checkStatus(), 3000);
+                    
+                    // 更新合约信息
+                    setTimeout(() => loadContractInfo(), 5000);
+                    
+                } else {
+                    console.error("Relay server error:", data.error);
+                    claimBtn.disabled = false;
+                    claimBtn.innerHTML = '<i class="fas fa-faucet"></i> Claim 0.01 CFX (Gas-Free)';
+                    
+                    showStatus("Error: " + data.error, "error");
+                }
+                
+            } catch (error) {
+                console.error("Claim error details:", error);
+                claimBtn.disabled = false;
+                claimBtn.innerHTML = '<i class="fas fa-faucet"></i> Claim 0.01 CFX (Gas-Free)';
+                
+                showStatus("Server error: " + error.message, "error");
+            }
+        }
+
+        // 显示状态
+        function showStatus(message, type) {
+            const element = document.getElementById('statusMessage');
+            element.innerHTML = message;
+            element.className = `status ${type}`;
+            element.style.display = 'block';
+            
+            if (type === 'success') {
+                setTimeout(() => {
+                    if (element.className.includes('success')) {
+                        element.style.display = 'none';
+                    }
+                }, 10000);
+            } else if (type === 'info') {
+                setTimeout(() => {
+                    if (element.className.includes('info')) {
+                        element.style.display = 'none';
+                    }
+                }, 5000);
+            }
+        }
+
+        // 监听钱包变化
+        if (window.ethereum) {
+            ethereum.on('accountsChanged', (accounts) => {
+                if (accounts.length === 0) {
+                    userAddress = null;
+                    document.getElementById('walletInfo').style.display = 'none';
+                    document.getElementById('step1').classList.remove('completed');
+                    document.getElementById('step2').classList.remove('active');
+                    document.getElementById('step3').classList.remove('active');
+                    showStatus("Wallet disconnected", "info");
+                } else {
+                    userAddress = accounts[0];
+                    updateWalletDisplay();
+                    checkStatus();
+                }
+            });
+            
+            ethereum.on('chainChanged', () => {
+                window.location.reload();
+            });
+        }
+        
+        // 手动测试函数
+        window.testContract = async function() {
+            if (!userAddress) {
+                alert("Please connect wallet first");
+                return;
+            }
+            
+            try {
+                const web3 = new Web3(window.ethereum);
+                const contractAddress = CONFIG.contractAddress;
+                
+                // 检查合约代码
+                const code = await web3.eth.getCode(contractAddress);
+                console.log("Contract code length:", code.length);
+                
+                if (code === '0x' || code === '0x0') {
+                    alert("Contract does not exist at this address!");
+                    return;
+                }
+                
+                // 检查合约余额
+                const balance = await web3.eth.getBalance(contractAddress);
+                const balanceCFX = web3.utils.fromWei(balance, 'ether');
+                console.log("Contract balance:", balanceCFX, "CFX");
+                
+                alert(`Contract exists at ${contractAddress}\nBalance: ${balanceCFX} CFX`);
+                
+            } catch (error) {
+                console.error("Test contract error:", error);
+                alert("Error testing contract: " + error.message);
+            }
+        };
+        
+        // 检查交易状态
+        window.checkTransaction = async function(txHash) {
+            if (!txHash) {
+                alert("Please enter a transaction hash");
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${CONFIG.serverUrl}/check-tx/${txHash}`);
+                const data = await response.json();
+                
+                alert(`Transaction Status: ${data.status}\n${data.message || ''}`);
+            } catch (error) {
+                console.error("Check transaction error:", error);
+                alert("Error checking transaction: " + error.message);
+            }
+        };
+        
+        // 刷新服务器状态
+        window.refreshServerStatus = function() {
+            checkServerStatus();
+            showStatus("Refreshing server status...", "info");
+        };
+    </script>
+</body>
+</html>

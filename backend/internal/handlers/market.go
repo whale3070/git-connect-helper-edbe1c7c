@@ -1,3 +1,4 @@
+//从 Redis 里把“所有书籍按销量排名的大盘数据”查出来，给前端展示用。
 package handlers
 
 import (

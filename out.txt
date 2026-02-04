@@ -1,0 +1,61 @@
+    return apiFetch<{ ok: boolean; txHash: string; bookAddr: string; error?: string }>(
+      `/api/v1/publisher/deploy-book`,
+      {
+        method: 'POST',
+        body: JSON.stringify(params),
+      },
+      async () => {
+        await mockDelay(2000);
+        const txHash = generateFakeTxHash();
+        return { ok: true, txHash, bookAddr: txHash };
+      }
+    );
+  }, [apiFetch]);
+
+  /**
+   * 获取出版社余额
+   * GET /api/v1/publisher/balance?address=xxx
+   */
+  const getPublisherBalance = useCallback(async (address: string) => {
+    return apiFetch<{ ok: boolean; balance: string; maxDeploys: number }>(
+      `/api/v1/publisher/balance?address=${encodeURIComponent(address)}`,
+      { method: 'GET' },
+      async () => {
+        await mockDelay(500);
+        return {
+          ok: true,
+          balance: (Math.random() * 200).toFixed(2),
+          maxDeploys: Math.floor(Math.random() * 20) + 5,
+        };
+      }
+    );
+  }, [apiFetch]);
+
+  // ========== 分析相关 API ==========
+
+  /**
+   * 获取热力图数据
+   * GET /api/v1/analytics/heatmap
+   * Response: { ok: true, regions: [...] }
+   */
+  const fetchHeatmapData = useCallback(async () => {
+    return apiFetch<{ ok: boolean; regions: Array<{ name: string; value: [number, number, number] }> }>(
+      `/api/v1/analytics/heatmap`,
+      { method: 'GET' },
+      async () => {
+        await mockDelay(300);
+        return {
+          ok: true,
+          regions: MOCK_REGIONS,
+        };
+      }
+    );
+  }, [apiFetch]);
+
+  /**
+   * 获取书籍/市场数据
+   * GET /api/v1/market/tickers
+   */
+  const fetchBooks = useCallback(async (page = 1) => {
+    return apiFetch<{ data: typeof MOCK_BOOKS; total: number; page: number }>(
+      `/api/v1/market/tickers?page=${page}`,

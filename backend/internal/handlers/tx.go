@@ -1,3 +1,4 @@
+//查交易结果 + 解析 NFT Mint 成功信息 + 写入 Redis 缓存
 package handlers
 
 import (

@@ -1,3 +1,4 @@
+//读者扫码 → 先在 Redis 做校验和暂存 → 凑够规则后发起奖励交易 → 提供统计查询
 package handlers
 
 import (

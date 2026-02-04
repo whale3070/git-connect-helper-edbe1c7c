@@ -1,3 +1,4 @@
+//“铸造 NFT（mint）中继服务” 的 Go 代码文件（package handlers）。它的作用是：前端/客户端发一个 HTTP 请求过来，这个服务用你配置的 Relayer 私钥 去链上调用书籍合约的 mintToReader(address)，并把 交易哈希 tx_hash 返回给前端。
 package handlers
 
 import (
