@@ -1,6 +1,19 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { CheckCircle, ShieldCheck, ExternalLink, Loader2, Users, LineChart, MapPin, Globe, RefreshCw, Clock, AlertCircle, MessageCircle } from 'lucide-react';
+import {
+  CheckCircle,
+  ShieldCheck,
+  ExternalLink,
+  Loader2,
+  Users,
+  LineChart,
+  MapPin,
+  Globe,
+  RefreshCw,
+  Clock,
+  AlertCircle,
+  MessageCircle,
+} from 'lucide-react';
 import { useAppMode } from '../contexts/AppModeContext';
 import { mockDelay, MOCK_REGIONS, getRandomBook } from '../data/mockData';
 import { useApi } from '../hooks/useApi';
@@ -16,16 +29,23 @@ interface TxData {
   cached?: boolean;
 }
 
+/**
+ * Success page (Mint result)
+ *
+ * Key fix:
+ * - DO NOT hardcode data-contract for the faucet plugin.
+ * - Use the real minted contract (txData.contract), or fallbacks from URL params.
+ */
 const Success = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { isMockMode } = useAppMode();
   const { queryTransaction } = useApi();
-  
+
   const txHash = searchParams.get('txHash');
   const userAddress = (searchParams.get('address') || '0x' + 'a'.repeat(40)).toLowerCase();
   const codeHash = searchParams.get('codeHash');
-  const initialStatus = searchParams.get('status') as TxStatus || 'pending';
+  const initialStatus = (searchParams.get('status') as TxStatus) || 'pending';
 
   const [txStatus, setTxStatus] = useState<TxStatus>(initialStatus);
   const [txData, setTxData] = useState<TxData | null>(null);
@@ -35,17 +55,26 @@ const Success = () => {
   const [mintedBook, setMintedBook] = useState(getRandomBook());
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
 
+  // Fallback contract from URL for robustness (in case txData isn't ready yet)
+  // Supports both ?contract= and legacy ?book_address=
+  const contractFromUrl = useMemo(() => {
+    const c = (searchParams.get('contract') || searchParams.get('book_address') || '').trim();
+    return c;
+  }, [searchParams]);
+
+  const effectiveContract = (txData?.contract || contractFromUrl || '').trim();
+
   // 查询交易状态
   const checkTxStatus = useCallback(async () => {
     if (!txHash) return;
-    
+
     setIsRefreshing(true);
     setTxStatus('syncing');
-    
+
     try {
       const result = await queryTransaction(txHash);
       setLastChecked(new Date());
-      
+
       if (result.ok && result.data) {
         setTxData({
           status: result.data.status,
@@ -55,7 +84,7 @@ const Success = () => {
           txHash: result.data.txHash || txHash,
           cached: (result.data as any).cached,
         });
-        
+
         if (result.data.status === 'SUCCESS') {
           setTxStatus('success');
           // 成功后模拟加载额外数据
@@ -80,45 +109,67 @@ const Success = () => {
   // 初始加载
   useEffect(() => {
     if (initialStatus === 'pending') {
-      // 如果是pending状态，显示同步中提示
       setTxStatus('pending');
     }
   }, [initialStatus]);
 
-  // 加载「看广告领 Gas / 空投」插件（Conflux Faucet Plugin）
+  // OPTIONAL: auto-check once if we have txHash and status isn't success/failed yet
   useEffect(() => {
-    // 仅在浏览器环境执行
+    if (!txHash) return;
+    if (initialStatus === 'pending') {
+      // Fire and forget (UI has refresh button anyway)
+      checkTxStatus();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [txHash]);
+
+  /**
+   * Load 「看广告领 Gas / 空投」插件（Conflux Faucet Plugin）
+   * Fix: data-contract must be the real contract, not hardcoded.
+   */
+  useEffect(() => {
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
 
+    // Only inject when we have a valid-looking contract address
+    if (!effectiveContract || !/^0x[a-fA-F0-9]{40}$/.test(effectiveContract)) return;
+
     const SCRIPT_ID = 'conflux-faucet-plugin';
-    // 避免重复插入
-    if (document.getElementById(SCRIPT_ID)) return;
+
+    // If already exists, just update attributes (in case contract changes)
+    const existing = document.getElementById(SCRIPT_ID) as HTMLScriptElement | null;
+    if (existing) {
+      existing.setAttribute('data-contract', effectiveContract);
+      return;
+    }
 
     const script = document.createElement('script');
     script.id = SCRIPT_ID;
+    // NOTE: keep your current plugin origin; change to https when available
     script.src = 'http://47.76.50.74/conflux-faucet-plugin.js';
     script.async = true;
 
-    script.setAttribute('data-contract', '0x6CD9AFBCfC6cE793A4Ed3293127735B47DDD842B');
+    script.setAttribute('data-contract', effectiveContract);
     script.setAttribute('data-server', 'http://whale3070.com:3000');
     script.setAttribute('data-position', 'bottom-right');
     script.setAttribute('data-text', 'Get Free CFX');
     script.setAttribute('data-color', '#1a2980');
 
     document.body.appendChild(script);
-  }, []);
 
+    // Cleanup to avoid stale plugin if user navigates away
+    return () => {
+      const el = document.getElementById(SCRIPT_ID);
+      if (el && el.parentNode) el.parentNode.removeChild(el);
+    };
+  }, [effectiveContract]);
 
-  const displayTokenId = txData?.tokenId && txData.tokenId !== '0' 
-    ? `#${txData.tokenId}` 
-    : '#---';
+  const displayTokenId = txData?.tokenId && txData.tokenId !== '0' ? `#${txData.tokenId}` : '#---';
 
   // 待确认状态 UI
   if (txStatus === 'pending' || txStatus === 'syncing') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col items-center py-12 px-4">
         <div className="max-w-md w-full space-y-8">
-          
           <div className={`${isMockMode ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'} border rounded-lg p-2 text-center`}>
             <p className={`text-xs font-semibold uppercase tracking-wider ${isMockMode ? 'text-amber-700' : 'text-emerald-700'}`}>
               {isMockMode ? '🔧 Demo Mode' : '🟢 Dev API'}
@@ -143,7 +194,7 @@ const Success = () => {
                 <p className="text-xs text-slate-500">通常需要 1-5 分钟完成铸造并通知所有区块</p>
               </div>
             </div>
-            
+
             {txHash && (
               <div className="bg-white rounded-xl p-4 border border-amber-100">
                 <p className="text-xs text-slate-400 uppercase font-semibold mb-1">交易哈希</p>
@@ -152,9 +203,7 @@ const Success = () => {
             )}
 
             {lastChecked && (
-              <p className="text-xs text-slate-400 text-center">
-                上次检查: {lastChecked.toLocaleTimeString()}
-              </p>
+              <p className="text-xs text-slate-400 text-center">上次检查: {lastChecked.toLocaleTimeString()}</p>
             )}
           </div>
 
@@ -177,10 +226,7 @@ const Success = () => {
           </button>
 
           <div className="text-center">
-            <button 
-              onClick={() => navigate('/bookshelf')}
-              className="text-xs text-slate-400 hover:text-indigo-600 transition-colors uppercase tracking-widest"
-            >
+            <button onClick={() => navigate('/bookshelf')} className="text-xs text-slate-400 hover:text-indigo-600 transition-colors uppercase tracking-widest">
               返回书架
             </button>
           </div>
@@ -226,7 +272,6 @@ const Success = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col items-center py-12 px-4">
       <div className="max-w-md w-full space-y-8">
-        
         <div className={`${isMockMode ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'} border rounded-lg p-2 text-center`}>
           <p className={`text-xs font-semibold uppercase tracking-wider ${isMockMode ? 'text-amber-700' : 'text-emerald-700'}`}>
             {isMockMode ? '🔧 Demo Mode' : '🟢 Dev API'}
@@ -243,7 +288,12 @@ const Success = () => {
         </div>
 
         <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center gap-4 shadow-soft">
-          <img src={mintedBook.coverImage} alt={mintedBook.title} className="w-16 h-24 object-cover rounded-lg" onError={(e) => { e.currentTarget.src = 'https://placehold.co/100x150/e2e8f0/6366f1?text=NFT'; }} />
+          <img
+            src={mintedBook.coverImage}
+            alt={mintedBook.title}
+            className="w-16 h-24 object-cover rounded-lg"
+            onError={(e) => { e.currentTarget.src = 'https://placehold.co/100x150/e2e8f0/6366f1?text=NFT'; }}
+          />
           <div>
             <p className="text-slate-800 font-bold">{mintedBook.title}</p>
             <p className="text-xs text-slate-400">{mintedBook.author}</p>
@@ -279,22 +329,20 @@ const Success = () => {
             <span className="text-xs text-slate-400 uppercase font-semibold">绑定地址</span>
             <p className="text-xs text-slate-500 font-mono break-all">{txData?.reader || userAddress}</p>
           </div>
-          {txData?.contract && (
+          {(txData?.contract || contractFromUrl) && (
             <div className="space-y-1">
               <span className="text-xs text-slate-400 uppercase font-semibold">合约地址</span>
-              <p className="text-xs text-slate-500 font-mono break-all">{txData.contract}</p>
+              <p className="text-xs text-slate-500 font-mono break-all">{(txData?.contract || contractFromUrl).trim()}</p>
             </div>
           )}
           {txData?.cached && (
-            <div className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded inline-block">
-              ⚡ 缓存数据
-            </div>
+            <div className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded inline-block">⚡ 缓存数据</div>
           )}
         </div>
 
         <div className="grid grid-cols-1 gap-3">
           <p className="text-xs text-slate-400 font-semibold uppercase tracking-widest text-center mb-1">下一步行动计划</p>
-          
+
           <button onClick={() => navigate('/Heatmap')} className="flex items-center gap-4 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 p-4 rounded-2xl hover:from-indigo-100 hover:to-purple-100 transition-all group text-left">
             <div className="bg-indigo-100 p-3 rounded-xl"><Globe className="w-5 h-5 text-indigo-600" /></div>
             <div>
@@ -311,12 +359,7 @@ const Success = () => {
             </div>
           </button>
 
-          <a 
-            href="https://matrix.to/#/!jOcJpAxdUNYvaMZuqJ:matrix.org" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="flex items-center gap-4 bg-gradient-to-r from-pink-50 to-rose-50 border border-pink-200 p-4 rounded-2xl hover:from-pink-100 hover:to-rose-100 transition-all group text-left"
-          >
+          <a href="https://matrix.to/#/!jOcJpAxdUNYvaMZuqJ:matrix.org" target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 bg-gradient-to-r from-pink-50 to-rose-50 border border-pink-200 p-4 rounded-2xl hover:from-pink-100 hover:to-rose-100 transition-all group text-left">
             <div className="bg-pink-100 p-3 rounded-xl"><MessageCircle className="w-5 h-5 text-pink-600" /></div>
             <div>
               <h4 className="text-sm font-bold text-slate-800">加入读者俱乐部</h4>
@@ -327,7 +370,7 @@ const Success = () => {
           <button onClick={() => navigate('/bookshelf')} className="flex items-center gap-4 bg-gradient-to-r from-indigo-500 to-purple-500 p-4 rounded-2xl hover:from-indigo-600 hover:to-purple-600 transition-all group text-left shadow-md">
             <div className="bg-white/20 p-3 rounded-xl"><LineChart className="w-5 h-5 text-white" /></div>
             <div>
-              <h4 className="text-sm font-bold text-white">进入"终焉大盘系统"</h4>
+              <h4 className="text-sm font-bold text-white">进入&quot;终焉大盘系统&quot;</h4>
               <p className="text-xs text-white/80">预判销量第一的爆款书籍</p>
             </div>
           </button>
@@ -335,11 +378,7 @@ const Success = () => {
 
         {txHash && (
           <div className="pt-4 text-center">
-            <button 
-              onClick={checkTxStatus}
-              disabled={isRefreshing}
-              className="text-xs text-slate-400 hover:text-indigo-600 transition-colors inline-flex items-center gap-1.5 uppercase tracking-widest disabled:opacity-50"
-            >
+            <button onClick={checkTxStatus} disabled={isRefreshing} className="text-xs text-slate-400 hover:text-indigo-600 transition-colors inline-flex items-center gap-1.5 uppercase tracking-widest disabled:opacity-50">
               {isRefreshing ? (
                 <>
                   <Loader2 className="w-3 h-3 animate-spin" />

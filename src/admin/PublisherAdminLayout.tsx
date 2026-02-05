@@ -46,6 +46,19 @@ export type PublisherOutletContext = {
   regionRanks: RegionRank[];
   totalSales: number;
 
+  // on-chain NFT stats (per contract)
+  nftStatsMap: Record<
+    string,
+    {
+      contract: string;
+      last_scanned_block: number;
+      minted_total: number;
+      unique_minters: number;
+      unique_real_users: number;
+    }
+  >;
+  refreshNftStats: (contracts?: string[]) => Promise<void>;
+
   // add book form
   bookName: string;
   setBookName: (v: string) => void;
@@ -173,6 +186,19 @@ export default function PublisherAdminLayout() {
   const [regionRanks, setRegionRanks] = useState<RegionRank[]>([]);
   const [totalSales, setTotalSales] = useState<number>(0);
 
+  const [nftStatsMap, setNftStatsMap] = useState<
+    Record<
+      string,
+      {
+        contract: string;
+        last_scanned_block: number;
+        minted_total: number;
+        unique_minters: number;
+        unique_real_users: number;
+      }
+    >
+  >({});
+
   // form
   const [bookName, setBookName] = useState<string>("");
   const [author, setAuthor] = useState<string>("");
@@ -226,6 +252,49 @@ export default function PublisherAdminLayout() {
     const url = `${origin()}/api/v1/analytics/distribution`;
     return fetchJsonOrThrow<{ ok: boolean; regions?: any[]; error?: string }>(url, { method: "GET" });
   };
+
+
+  // -----------------------------
+  // On-chain NFT stats (per contract)
+  // -----------------------------
+  const fetchNftStatsOne = async (contract: string) => {
+    const c = (contract || "").trim();
+    if (!isHexAddress(c)) return null;
+
+    const url = `${origin()}/api/v1/nft/stats?contract=${encodeURIComponent(c)}`;
+    const res = await fetchJsonOrThrow<{ ok: boolean; data?: any }>(url, { method: "GET" });
+
+    if (!res?.ok || !res?.data) return null;
+    return res.data as {
+      contract: string;
+      last_scanned_block: number;
+      minted_total: number;
+      unique_minters: number;
+      unique_real_users: number;
+    };
+  };
+
+  const refreshNftStats = async (contracts?: string[]) => {
+    if (envMode !== "real") return;
+
+    const list = (contracts && contracts.length ? contracts : bookSales.map((b) => b.address))
+      .map((x) => (x || "").toLowerCase())
+      .filter((x) => isHexAddress(x));
+
+    const uniq = Array.from(new Set(list));
+    if (uniq.length === 0) return;
+
+    const results = await Promise.all(uniq.map((c) => fetchNftStatsOne(c)));
+
+    setNftStatsMap((prev) => {
+      const next = { ...prev };
+      for (const r of results) {
+        if (r?.contract) next[r.contract.toLowerCase()] = r;
+      }
+      return next;
+    });
+  };
+
 
   // 切换 env 时读取各自 storage
   useEffect(() => {
@@ -327,6 +396,9 @@ export default function PublisherAdminLayout() {
         } else {
           setRegionRanks([]);
         }
+
+        // Refresh on-chain stats for visible books
+        await refreshNftStats(realBooks.map((b) => b.address));
 
         return;
       }
@@ -606,6 +678,9 @@ export default function PublisherAdminLayout() {
     bookSales,
     regionRanks,
     totalSales,
+
+    nftStatsMap,
+    refreshNftStats,
 
     bookName,
     setBookName,

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/subtle"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -11,7 +12,11 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gorilla/mux"
@@ -32,6 +37,240 @@ var (
 	chainID *big.Int
 )
 
+// ========================================
+// NFT Stats (ERC-721 Transfer logs)
+// ========================================
+
+var (
+	// ERC721 Transfer(address indexed from, address indexed to, uint256 indexed tokenId)
+	transferSigHash = common.HexToHash("0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef")
+
+	zeroTopic = "0x0000000000000000000000000000000000000000000000000000000000000000"
+	// Conflux eSpace 常见系统/预留地址（你要求过滤的那个）
+	systemUser = "0x0000000000000000000000000000000000001000"
+)
+
+type NFTStatsJob struct {
+	RDB           *redis.Client
+	Client        *ethclient.Client
+	Contract      common.Address
+	FromBlockHint uint64        // 合约部署区块（强烈建议配上）
+	Interval      time.Duration // 例如 30s/1m/5m
+	ChunkSize     uint64        // 分段扫区块，避免 RPC 超时（例如 50_000）
+	Logger        *log.Logger
+}
+
+// Start 启动定时任务（建议 goroutine）
+func (j *NFTStatsJob) Start(ctx context.Context) {
+	if j.Interval <= 0 {
+		j.Interval = 1 * time.Minute
+	}
+	if j.ChunkSize == 0 {
+		j.ChunkSize = 50_000
+	}
+
+	// 启动时先跑一遍
+	j.runOnce(ctx)
+
+	ticker := time.NewTicker(j.Interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			j.logf("NFTStatsJob stopped: %v", ctx.Err())
+			return
+		case <-ticker.C:
+			j.runOnce(ctx)
+		}
+	}
+}
+
+func (j *NFTStatsJob) runOnce(ctx context.Context) {
+	if j.RDB == nil || j.Client == nil {
+		j.logf("NFTStatsJob missing deps: rdb/client nil")
+		return
+	}
+
+	contract := strings.ToLower(j.Contract.Hex())
+
+	// Redis keys
+	keyPrefix := fmt.Sprintf("vault:stats:nft:%s", contract)
+	keyLast := keyPrefix + ":last_block"
+	keyMinted := keyPrefix + ":minted_total"
+	keyUnique := keyPrefix + ":unique_minters"
+	keyReal := keyPrefix + ":unique_real_users"
+	keyMintersSet := keyPrefix + ":minters:set"
+	keyRealSet := keyPrefix + ":real_users:set"
+
+	// 读 last scanned block（增量）
+	startBlock := j.FromBlockHint
+	if v, err := j.RDB.Get(ctx, keyLast).Result(); err == nil && v != "" {
+		if b, ok := new(big.Int).SetString(v, 10); ok {
+			startBlock = b.Uint64() + 1
+		}
+	}
+
+	latest, err := j.Client.BlockNumber(ctx)
+	if err != nil {
+		j.logf("BlockNumber error: %v", err)
+		return
+	}
+	if startBlock > latest {
+		return
+	}
+
+	var (
+		mintedInc   int64
+		toBlockDone uint64
+	)
+
+	for from := startBlock; from <= latest; {
+		to := from + j.ChunkSize - 1
+		if to > latest {
+			to = latest
+		}
+
+		logs, err := j.fetchTransferLogs(ctx, from, to)
+		if err != nil {
+			j.logf("FilterLogs %d-%d error: %v", from, to, err)
+			return
+		}
+
+		for _, lg := range logs {
+			if len(lg.Topics) < 3 {
+				continue
+			}
+
+			// Mint: from == 0x0
+			fromTopic := strings.ToLower(lg.Topics[1].Hex())
+			if fromTopic != zeroTopic {
+				continue
+			}
+
+			mintedInc++
+
+			toAddr := strings.ToLower(topicToAddress(lg.Topics[2]))
+
+			// 领取者集合
+			_ = j.RDB.SAdd(ctx, keyMintersSet, toAddr).Err()
+
+			// 过滤系统地址后的真实用户集合
+			if toAddr != systemUser {
+				_ = j.RDB.SAdd(ctx, keyRealSet, toAddr).Err()
+			}
+		}
+
+		toBlockDone = to
+		from = to + 1
+	}
+
+	// minted_total：增量累加
+	if mintedInc > 0 {
+		_ = j.RDB.IncrBy(ctx, keyMinted, mintedInc).Err()
+	}
+
+	// unique_*：以 SCARD 为准（最稳）
+	uniqueMinters, _ := j.RDB.SCard(ctx, keyMintersSet).Result()
+	uniqueReal, _ := j.RDB.SCard(ctx, keyRealSet).Result()
+
+	_ = j.RDB.Set(ctx, keyUnique, uniqueMinters, 0).Err()
+	_ = j.RDB.Set(ctx, keyReal, uniqueReal, 0).Err()
+
+	// 更新 last scanned block
+	_ = j.RDB.Set(ctx, keyLast, fmt.Sprintf("%d", toBlockDone), 0).Err()
+
+	mintedTotal, _ := j.RDB.Get(ctx, keyMinted).Result()
+	j.logf("NFTStats updated contract=%s blocks=%d..%d minted+%d (total=%s) unique=%d real=%d",
+		contract, startBlock, toBlockDone, mintedInc, mintedTotal, uniqueMinters, uniqueReal,
+	)
+}
+
+func (j *NFTStatsJob) fetchTransferLogs(ctx context.Context, from, to uint64) ([]types.Log, error) {
+	q := ethereum.FilterQuery{
+		FromBlock: big.NewInt(int64(from)),
+		ToBlock:   big.NewInt(int64(to)),
+		Addresses: []common.Address{j.Contract},
+		Topics:    [][]common.Hash{{transferSigHash}},
+	}
+	return j.Client.FilterLogs(ctx, q)
+}
+
+func topicToAddress(topic common.Hash) string {
+	b := topic.Bytes() // 32 bytes
+	return "0x" + hex.EncodeToString(b[12:]) // last 20 bytes
+}
+
+func (j *NFTStatsJob) logf(format string, args ...any) {
+	if j.Logger != nil {
+		j.Logger.Printf(format, args...)
+	} else {
+		log.Printf(format, args...)
+	}
+}
+
+// 读 stats 给前端
+func nftStatsHandler() http.HandlerFunc {
+	type resp struct {
+		Ok   bool   `json:"ok"`
+		Error string `json:"error,omitempty"`
+		Data  any    `json:"data,omitempty"`
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		contract := strings.TrimSpace(r.URL.Query().Get("contract"))
+		if contract == "" {
+			// 允许走默认
+			contract = strings.TrimSpace(os.Getenv("NFT_STATS_CONTRACT"))
+		}
+		if !isHexAddress(contract) {
+			writeJSON(w, http.StatusBadRequest, resp{Ok: false, Error: "invalid contract"})
+			return
+		}
+		contract = strings.ToLower(contract)
+
+		keyPrefix := fmt.Sprintf("vault:stats:nft:%s", contract)
+		keyLast := keyPrefix + ":last_block"
+		keyMinted := keyPrefix + ":minted_total"
+		keyUnique := keyPrefix + ":unique_minters"
+		keyReal := keyPrefix + ":unique_real_users"
+
+		last, _ := rdb.Get(ctx, keyLast).Result()
+		minted, _ := rdb.Get(ctx, keyMinted).Result()
+		unique, _ := rdb.Get(ctx, keyUnique).Result()
+		real, _ := rdb.Get(ctx, keyReal).Result()
+
+		// 统一为数字（读不到就给 0）
+		toInt := func(s string) int64 {
+			s = strings.TrimSpace(s)
+			if s == "" {
+				return 0
+			}
+			v, err := strconv.ParseInt(s, 10, 64)
+			if err != nil {
+				return 0
+			}
+			return v
+		}
+
+		writeJSON(w, http.StatusOK, resp{
+			Ok: true,
+			Data: map[string]any{
+				"contract":           contract,
+				"minted_total":       toInt(minted),
+				"unique_minters":     toInt(unique),
+				"unique_real_users":  toInt(real),
+				"last_scanned_block": toInt(last),
+			},
+		})
+	}
+}
+
 func main() {
 	// ========================================
 	// 1. 初始化基础环境
@@ -50,7 +289,7 @@ func main() {
 	}
 	rdb = redis.NewClient(&redis.Options{
 		Addr:     redisAddr,
-		Protocol: 2, // ✅ 强制 RESP2，FT.SEARCH 返回数组结构，你的 parseFTSearchResult 就能正常工作
+		Protocol: 2, // ✅ 强制 RESP2
 	})
 	log.Println("✅ Redis 连接成功, addr =", redisAddr)
 
@@ -111,7 +350,7 @@ func main() {
 		Client: client,
 	}
 
-	// ✅ 出版社处理器（批量生成二维码 ZIP / 部署书合约）
+	// ✅ 出版社处理器
 	factoryAddr := strings.TrimSpace(os.Getenv("FACTORY_ADDR"))
 	if factoryAddr == "" {
 		log.Println("⚠️ FACTORY_ADDR 未设置：publisher.CreateBook 将无法正常调用工厂合约")
@@ -120,6 +359,49 @@ func main() {
 		RDB:         rdb,
 		Client:      client,
 		FactoryAddr: factoryAddr,
+	}
+
+	// ========================================
+	// 3.5 启动 NFT 统计任务（可选，但你要的就在这）
+	// ========================================
+	nftContract := strings.TrimSpace(os.Getenv("NFT_STATS_CONTRACT"))
+	if nftContract != "" && isHexAddress(nftContract) {
+		fromBlockHint := uint64(0)
+		if v := strings.TrimSpace(os.Getenv("NFT_STATS_FROM_BLOCK")); v != "" {
+			if u, e := strconv.ParseUint(v, 10, 64); e == nil {
+				fromBlockHint = u
+			}
+		}
+
+		interval := 1 * time.Minute
+		if v := strings.TrimSpace(os.Getenv("NFT_STATS_INTERVAL_SECONDS")); v != "" {
+			if sec, e := strconv.ParseInt(v, 10, 64); e == nil && sec > 0 {
+				interval = time.Duration(sec) * time.Second
+			}
+		}
+
+		chunk := uint64(50_000)
+		if v := strings.TrimSpace(os.Getenv("NFT_STATS_CHUNK")); v != "" {
+			if u, e := strconv.ParseUint(v, 10, 64); e == nil && u > 0 {
+				chunk = u
+			}
+		}
+
+		job := &NFTStatsJob{
+			RDB:           rdb,
+			Client:        client,
+			Contract:      common.HexToAddress(nftContract),
+			FromBlockHint: fromBlockHint,
+			Interval:      interval,
+			ChunkSize:     chunk,
+			Logger:        log.Default(),
+		}
+
+		go job.Start(ctx)
+		log.Printf("📊 NFTStatsJob started: contract=%s fromBlock=%d interval=%s chunk=%d",
+			strings.ToLower(common.HexToAddress(nftContract).Hex()), fromBlockHint, interval.String(), chunk)
+	} else {
+		log.Println("ℹ️ NFT_STATS_CONTRACT 未配置或无效：跳过 NFTStatsJob（如需启用，在 .env 配 NFT_STATS_CONTRACT=0x...）")
 	}
 
 	// ========================================
@@ -142,6 +424,10 @@ func main() {
 	r.HandleFunc("/api/v1/nft/total-minted", mintH.GetTotalMinted).Methods("GET", "OPTIONS")
 	r.PathPrefix("/relay/tx/").HandlerFunc(mintH.GetTxResult).Methods("GET", "OPTIONS")
 
+	// ✅ 新增：NFT 统计数据（前端展示用）
+	// GET /api/v1/nft/stats?contract=0x...
+	r.HandleFunc("/api/v1/nft/stats", nftStatsHandler()).Methods("GET", "OPTIONS")
+
 	// --- 大盘市场路由 ---
 	r.HandleFunc("/api/v1/tickers", marketH.GetTickers).Methods("GET", "OPTIONS")
 	r.HandleFunc("/api/v1/market/tickers", marketH.GetTickers).Methods("GET", "OPTIONS")
@@ -149,7 +435,6 @@ func main() {
 	// --- 工厂合约路由 (出版社后端代签) ---
 	r.HandleFunc("/api/v1/precheck-code", factoryH.PrecheckCode).Methods("GET", "OPTIONS")
 	r.HandleFunc("/api/v1/factory/verify-publisher", factoryH.VerifyPublisher).Methods("GET", "OPTIONS")
-
 	r.HandleFunc("/api/v1/publisher/balance", factoryH.GetPublisherBalance).Methods("GET", "OPTIONS")
 
 	// ✅ 出版社：批量生成读者专用二维码 ZIP
@@ -159,7 +444,6 @@ func main() {
 
 	// 出版社：通过工厂部署书合约 / 后端从 Redis 取私钥部署
 	r.HandleFunc("/api/v1/factory/create", factoryH.DeployBook).Methods("POST", "OPTIONS")
-	//r.HandleFunc("/api/v1/publisher/create-book", factoryH.DeployBook).Methods("POST", "OPTIONS")
 	r.HandleFunc("/api/v1/publisher/deploy-book", factoryH.DeployBook).Methods("POST", "OPTIONS")
 
 	// --- 数据分析路由 ---
@@ -168,8 +452,7 @@ func main() {
 	// --- 管理员路由 ---
 	r.HandleFunc("/api/admin/check-access", authH.CheckAdminAccess).Methods("GET", "OPTIONS")
 
-	// ✅ 新增：管理员给出版社充值 USDT（调用 usdt.go）
-	// POST /api/admin/usdt/recharge  body: {"to":"0x...","amount":1000}
+	// ✅ 管理员给出版社充值 USDT
 	r.HandleFunc("/api/admin/usdt/recharge", adminRechargeUSDTHandler()).Methods("POST", "OPTIONS")
 
 	// ========================================
@@ -195,7 +478,6 @@ func main() {
 type rechargeUSDTReq struct {
 	To     string `json:"to"`
 	Amount int64  `json:"amount"` // 人类单位：例如 1000 表示 1000 USDT
-	// 可选：如果你想加“备注/订单号”，可扩展字段
 }
 
 type apiResp struct {
@@ -211,9 +493,7 @@ func adminRechargeUSDTHandler() http.HandlerFunc {
 			return
 		}
 
-		// （可选）用一个简单 header 保护，避免公网随便打
-		// 在 .env 配 ADMIN_API_KEY=xxx
-		// 请求带：Authorization: Bearer xxx
+		// 可选：header 保护
 		if key := strings.TrimSpace(os.Getenv("ADMIN_API_KEY")); key != "" {
 			got := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
 			if subtle.ConstantTimeCompare([]byte(got), []byte(key)) != 1 {
@@ -257,7 +537,6 @@ func adminRechargeUSDTHandler() http.HandlerFunc {
 			return
 		}
 
-		// ✅ 这里就是调用你上传的 usdt.go
 		c := blockchain.NewUSDTClient(contract, rpcURL, priv)
 		tx, err := c.Recharge(to, req.Amount)
 		if err != nil {
