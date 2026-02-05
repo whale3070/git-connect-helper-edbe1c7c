@@ -184,6 +184,13 @@ func NewAuthHandler(rdb *redis.Client, client *ethclient.Client) *AuthHandler {
 // ==============================
 // GET /secret/get-binding?codeHash=...
 // 返回：address/privateKey/role/book_address
+//
+// ✅ 本版修复/增强点：
+// 1) CORS 统一回显（避免前端把 CORS 当成“404”）
+// 2) bind 不存在时：
+//    - 若 code 是合法 reader 且未 used，则【自动生成临时钱包】并写入 vault:bind:* 后返回（自愈）
+//    - publisher/author 仍然返回 404（防止误授权）
+// 3) used 判定兼容：vault:codes:used (SET) + 旧的 vault:codes:<code> (HASH used=true)
 // ==============================
 func (h *AuthHandler) GetBinding(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodOptions {
@@ -202,12 +209,10 @@ func (h *AuthHandler) GetBinding(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 	defer cancel()
 
 	// ✅ 抗迁移：同时尝试多种key形态
-	// - vault:bind:<64hex>
-	// - vault:bind:0x<64hex> （有些脚本/旧逻辑会这么存）
 	keysToTry := []string{
 		"vault:bind:" + codeHash,
 		"vault:bind:0x" + codeHash,
@@ -227,31 +232,8 @@ func (h *AuthHandler) GetBinding(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if len(bindData) == 0 {
-		// 给你可定位信息（不暴露敏感）
-		log.Printf("❌ GetBinding: bind not found. codeHash=%s tried=%v", codeHash, keysToTry)
-		h.sendJSON(w, http.StatusNotFound, map[string]any{
-			"ok":    false,
-			"error": "未找到绑定信息",
-		})
-		return
-	}
-
-	// ✅ 抗迁移：字段名兼容
-	address := strings.TrimSpace(bindData["address"])
-	if address == "" {
-		address = strings.TrimSpace(bindData["addr"])
-	}
-	privateKey := strings.TrimSpace(bindData["privateKey"])
-	if privateKey == "" {
-		privateKey = strings.TrimSpace(bindData["private_key"])
-	}
-	// 如果 privateKey 为空，不影响“只读身份确认”，但前端如果依赖它就会显示 Unknown
-	// 这里不直接报错，避免“部分数据无私钥”导致整个流程不可用
-
-	// ✅ 抗迁移：used set 也可能存 0x 版本
-	isUsed := h.isCodeUsed(ctx, codeHash)
-	if isUsed {
+	// 先判 used（避免自愈时把已核销码重新生成绑定）
+	if h.isCodeUsed(ctx, codeHash) {
 		h.sendJSON(w, http.StatusBadRequest, map[string]any{
 			"ok":    false,
 			"error": "激活码已核销",
@@ -261,7 +243,57 @@ func (h *AuthHandler) GetBinding(w http.ResponseWriter, r *http.Request) {
 
 	role := h.determineRole(ctx, codeHash)
 
-	// book address：兼容多个 env 名
+	// ✅ 自愈：bind 不存在，但 reader code 合法 -> 自动生成绑定
+	if len(bindData) == 0 {
+		if role == "reader" {
+			addr, privHex, genErr := h.ensureReaderBinding(ctx, codeHash)
+			if genErr != nil {
+				log.Printf("❌ GetBinding: ensureReaderBinding failed codeHash=%s err=%v", codeHash, genErr)
+				h.sendJSON(w, http.StatusInternalServerError, map[string]any{
+					"ok":    false,
+					"error": "生成读者绑定失败: " + genErr.Error(),
+				})
+				return
+			}
+
+			bookAddress := firstNonEmpty(
+				strings.TrimSpace(os.Getenv("CONTRACT_ADDR")),
+				strings.TrimSpace(os.Getenv("BOOK_CONTRACT")),
+				strings.TrimSpace(os.Getenv("BOOK_ADDRESS")),
+			)
+
+			h.sendJSON(w, http.StatusOK, map[string]any{
+				"ok":           true,
+				"role":         "reader",
+				"book_address": bookAddress,
+				"address":      addr,
+				"privateKey":   privHex,
+				"_hit":         "auto-generated",
+				"status":       "valid",
+				"message":      "读者激活码有效（已自动补齐绑定信息）",
+			})
+			return
+		}
+
+		// publisher/author/unknown：保持严格
+		log.Printf("❌ GetBinding: bind not found. role=%s codeHash=%s tried=%v", role, codeHash, keysToTry)
+		h.sendJSON(w, http.StatusNotFound, map[string]any{
+			"ok":    false,
+			"error": "未找到绑定信息",
+		})
+		return
+	}
+
+	// ✅ 字段名兼容
+	address := strings.TrimSpace(bindData["address"])
+	if address == "" {
+		address = strings.TrimSpace(bindData["addr"])
+	}
+	privateKey := strings.TrimSpace(bindData["privateKey"])
+	if privateKey == "" {
+		privateKey = strings.TrimSpace(bindData["private_key"])
+	}
+
 	bookAddress := firstNonEmpty(
 		strings.TrimSpace(os.Getenv("CONTRACT_ADDR")),
 		strings.TrimSpace(os.Getenv("BOOK_CONTRACT")),
@@ -274,8 +306,7 @@ func (h *AuthHandler) GetBinding(w http.ResponseWriter, r *http.Request) {
 		"book_address": bookAddress,
 		"address":      address,
 		"privateKey":   privateKey,
-		// debug: 哪个 key 命中（方便你定位数据写入形态问题）
-		"_hit": hitKey,
+		"_hit":         hitKey, // debug only
 	}
 
 	if role == "reader" {
@@ -309,7 +340,7 @@ func (h *AuthHandler) Verify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 	defer cancel()
 
 	if h.isCodeUsed(ctx, codeHash) {
@@ -321,6 +352,13 @@ func (h *AuthHandler) Verify(w http.ResponseWriter, r *http.Request) {
 	}
 
 	role := h.determineRole(ctx, codeHash)
+	if role == "unknown" {
+		h.sendJSON(w, http.StatusNotFound, map[string]any{
+			"ok":    false,
+			"error": "无效的激活码",
+		})
+		return
+	}
 
 	// 尝试从绑定里拿地址（兼容 key/字段）
 	address := ""
@@ -336,14 +374,6 @@ func (h *AuthHandler) Verify(w http.ResponseWriter, r *http.Request) {
 			address = strings.TrimSpace(v2)
 			break
 		}
-	}
-
-	if role == "unknown" {
-		h.sendJSON(w, http.StatusNotFound, map[string]any{
-			"ok":    false,
-			"error": "无效的激活码",
-		})
-		return
 	}
 
 	resp := map[string]any{
@@ -385,7 +415,7 @@ func (h *AuthHandler) CheckAdminAccess(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 	defer cancel()
 
 	isPublisher, _ := h.RDB.SIsMember(ctx, "vault:roles:publishers", address).Result()
@@ -407,14 +437,14 @@ func (h *AuthHandler) CheckAdminAccess(w http.ResponseWriter, r *http.Request) {
 }
 
 // ==============================
-// GET /secret/health （可选，不影响 main.go）
+// GET /secret/health （可选）
 // ==============================
 func (h *AuthHandler) Health(w http.ResponseWriter, r *http.Request) {
 	h.sendJSON(w, http.StatusOK, map[string]any{
 		"ok":        true,
 		"service":   "vault-auth",
 		"timestamp": time.Now().Unix(),
-		"version":   "migrate-hardened-1",
+		"version":   "migrate-hardened-2",
 	})
 }
 
@@ -436,6 +466,7 @@ func (h *AuthHandler) determineRole(ctx context.Context, codeHash string) string
 		}
 	}
 	for _, c := range cands {
+		// reader codes（你当前 zip 生成是写入 vault:codes:valid SET，成员一般是 0x...）
 		if ok, _ := h.RDB.SIsMember(ctx, "vault:codes:valid", c).Result(); ok {
 			return "reader"
 		}
@@ -443,21 +474,100 @@ func (h *AuthHandler) determineRole(ctx context.Context, codeHash string) string
 	return "unknown"
 }
 
+// isCodeUsed 兼容：
+// 1) 新：vault:codes:used (SET)
+// 2) 旧：vault:codes:<code> (HASH) 字段 used=true / 1
 func (h *AuthHandler) isCodeUsed(ctx context.Context, codeHash string) bool {
-	// used 集合也兼容 0x/不带0x
+	// 1) used set 兼容 0x/不带0x
 	for _, c := range []string{codeHash, "0x" + codeHash} {
 		isUsed, _ := h.RDB.SIsMember(ctx, "vault:codes:used", c).Result()
 		if isUsed {
 			return true
 		}
 	}
+
+	// 2) legacy: vault:codes:<code> hash (这里约定 key 使用 0x 前缀更常见)
+	for _, c := range []string{"0x" + codeHash, codeHash} {
+		key := "vault:codes:" + c
+		v, err := h.RDB.HGet(ctx, key, "used").Result()
+		if err == nil {
+			v = strings.ToLower(strings.TrimSpace(v))
+			if v == "true" || v == "1" || v == "yes" {
+				return true
+			}
+		}
+	}
 	return false
 }
 
+// ensureReaderBinding: 当 reader code 合法但 bind 缺失时，自愈生成钱包并双写 vault:bind:*
+// 返回：address, privateKeyHex(0x...), error
+func (h *AuthHandler) ensureReaderBinding(ctx context.Context, codeHash string) (string, string, error) {
+	// 先 double-check：避免并发重复生成
+	for _, k := range []string{"vault:bind:" + codeHash, "vault:bind:0x" + codeHash} {
+		data, e := h.RDB.HGetAll(ctx, k).Result()
+		if e == nil && len(data) > 0 {
+			addr := strings.TrimSpace(firstNonEmpty(data["address"], data["addr"]))
+			pk := strings.TrimSpace(firstNonEmpty(data["privateKey"], data["private_key"]))
+			return addr, normalizePrivKey(pk), nil
+		}
+	}
+
+	// 生成新钱包
+	pk, err := crypto.GenerateKey()
+	if err != nil {
+		return "", "", err
+	}
+	addr := strings.ToLower(crypto.PubkeyToAddress(pk.PublicKey).Hex())
+	privHex := "0x" + hexNo0x(crypto.FromECDSA(pk)) // 0x-prefixed
+
+	mapping := map[string]any{
+		"address":      addr,
+		"private_key":  strings.TrimPrefix(privHex, "0x"), // 兼容你其它模块的字段名
+		"privateKey":   privHex,                           // 兼容前端老字段
+		"role":         "reader",
+		"generated_at": time.Now().Unix(),
+	}
+
+	pipe := h.RDB.Pipeline()
+	pipe.HSet(ctx, "vault:bind:"+codeHash, mapping)
+	pipe.HSet(ctx, "vault:bind:0x"+codeHash, mapping)
+	_, err = pipe.Exec(ctx)
+	if err != nil {
+		return "", "", err
+	}
+	return addr, privHex, nil
+}
+
+func normalizePrivKey(pk string) string {
+	pk = strings.TrimSpace(pk)
+	if pk == "" {
+		return ""
+	}
+	if strings.HasPrefix(pk, "0x") {
+		return pk
+	}
+	// 如果是 64 hex
+	s := strings.TrimPrefix(strings.ToLower(pk), "0x")
+	if len(s) == 64 && isHexLowerOrUpper(s) {
+		return "0x" + s
+	}
+	return pk
+}
+
+func hexNo0x(b []byte) string {
+	return strings.TrimPrefix(strings.ToLower(common.Bytes2Hex(b)), "0x")
+}
+
 // ==============================
-// sendJSON
+// sendJSON + CORS
 // ==============================
 func (h *AuthHandler) sendJSON(w http.ResponseWriter, code int, payload any) {
+	// ✅ 同域也建议保留，避免未来切分域名/端口时前端“误判 404”
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(code)
 	if err := json.NewEncoder(w).Encode(payload); err != nil {
