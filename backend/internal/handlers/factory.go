@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -108,7 +109,7 @@ func (h *FactoryHandler) DeployBook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// -----------------------------
-	// 1) 用 publisher 私钥转 10 USDT 到 TREASURY_ADDRESS（成功后再部署）
+	// 1) 用 publisher 私钥转 USDT 到 TREASURY_ADDRESS（成功后再部署）
 	// -----------------------------
 	usdtAddr := strings.TrimSpace(os.Getenv("USDT_CONTRACT"))
 	if usdtAddr == "" {
@@ -152,11 +153,12 @@ func (h *FactoryHandler) DeployBook(w http.ResponseWriter, r *http.Request) {
 	// -----------------------------
 	// 2) 用 BACKEND_PRIVATE_KEY 代付部署合约（调用工厂 createBook）
 	// -----------------------------
-	factoryAddr := strings.TrimSpace(os.Getenv("FACTORY_ADDR"))
-	if !common.IsHexAddress(factoryAddr) {
+	factoryAddrStr := strings.TrimSpace(os.Getenv("FACTORY_ADDR"))
+	if !common.IsHexAddress(factoryAddrStr) {
 		h.sendJSON(w, 500, map[string]interface{}{"ok": false, "error": "FACTORY_ADDR 未设置或格式不正确"})
 		return
 	}
+	factoryAddr := common.HexToAddress(factoryAddrStr)
 
 	backendPrivHex := strings.TrimSpace(os.Getenv("BACKEND_PRIVATE_KEY"))
 	backendPrivHex = strings.TrimPrefix(backendPrivHex, "0x")
@@ -170,7 +172,7 @@ func (h *FactoryHandler) DeployBook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	txHash, err := h.deployByFactory(ctx, backendPriv, common.HexToAddress(factoryAddr), req, common.HexToAddress(req.Publisher))
+	txHash, err := h.deployByFactory(ctx, backendPriv, factoryAddr, req, common.HexToAddress(req.Publisher))
 	if err != nil {
 		h.sendJSON(w, 500, map[string]interface{}{
 			"ok":         false,
@@ -180,11 +182,59 @@ func (h *FactoryHandler) DeployBook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// -----------------------------
+	// 3) 等部署 receipt，解析新合约地址 bookAddr（必须拿到真实地址才能落库）
+	// -----------------------------
+	receipt, err := h.waitReceipt(ctx, common.HexToHash(txHash), 60*time.Second)
+	if err != nil {
+		h.sendJSON(w, 500, map[string]interface{}{
+			"ok":         false,
+			"error":      "部署交易未确认: " + err.Error(),
+			"txHash":     txHash,
+			"usdtTxHash": usdtTxHash,
+		})
+		return
+	}
+	if receipt.Status != 1 {
+		h.sendJSON(w, 500, map[string]interface{}{
+			"ok":         false,
+			"error":      fmt.Sprintf("部署交易失败 status=%d", receipt.Status),
+			"txHash":     txHash,
+			"usdtTxHash": usdtTxHash,
+		})
+		return
+	}
+
+	bookAddr, err := h.parseBookAddrFromReceipt(ctx, factoryAddr, receipt)
+	if err != nil || (bookAddr == common.Address{}) {
+		h.sendJSON(w, 500, map[string]interface{}{
+			"ok":         false,
+			"error":      "无法从 receipt 解析新书合约地址 bookAddr: " + err.Error(),
+			"txHash":     txHash,
+			"usdtTxHash": usdtTxHash,
+		})
+		return
+	}
+
+	// -----------------------------
+	// 4) 写入 Redis：vault:book:meta:<bookAddr>（这会被 idx:books 自动索引）
+	// -----------------------------
+	if err := h.saveBookMeta(ctx, bookAddr, req); err != nil {
+		h.sendJSON(w, 500, map[string]interface{}{
+			"ok":         false,
+			"error":      "写入 Redis 失败: " + err.Error(),
+			"txHash":     txHash,
+			"usdtTxHash": usdtTxHash,
+			"bookAddr":   strings.ToLower(bookAddr.Hex()),
+		})
+		return
+	}
+
 	h.sendJSON(w, 200, map[string]interface{}{
 		"ok":         true,
 		"usdtTxHash": usdtTxHash,
 		"txHash":     txHash,
-		"bookAddr":   txHash, // 你现在仍用 txHash 占位；后续可用 receipt/log 解析真实子合约地址
+		"bookAddr":   strings.ToLower(bookAddr.Hex()),
 	})
 }
 
@@ -280,7 +330,7 @@ func (h *FactoryHandler) transferERC20(ctx context.Context, fromPriv *ecdsa.Priv
 }
 
 // -----------------------------
-// 等交易 receipt 成功
+// 等交易 receipt 成功（仅判断 status）
 // -----------------------------
 func (h *FactoryHandler) waitTxSuccess(ctx context.Context, txHash common.Hash, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
@@ -295,6 +345,139 @@ func (h *FactoryHandler) waitTxSuccess(ctx context.Context, txHash common.Hash, 
 		time.Sleep(1200 * time.Millisecond)
 	}
 	return errors.New("timeout waiting receipt")
+}
+
+// 等 receipt（返回 receipt）
+func (h *FactoryHandler) waitReceipt(ctx context.Context, txHash common.Hash, timeout time.Duration) (*types.Receipt, error) {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		receipt, err := h.Client.TransactionReceipt(ctx, txHash)
+		if err == nil && receipt != nil {
+			return receipt, nil
+		}
+		time.Sleep(1200 * time.Millisecond)
+	}
+	return nil, errors.New("timeout waiting receipt")
+}
+
+// -----------------------------
+// 从 receipt 解析 bookAddr
+//
+// 说明：由于你当前 factory ABI 没有事件定义，这里采用“可配置 + 兜底启发式”的解析方式：
+// - 推荐：在 .env 配置 BOOK_CREATED_EVENT_TOPIC0（0x...），与 factory 合约 emit 的事件 topic0 一致
+// - 如果未配置：尝试从 logs 中找第一个 address==factory 的 log，取 Topics[1] 作为 bookAddr（需 indexed address）
+// - 解析后会用 CodeAt 校验该地址确实是合约（code != 0x）
+// -----------------------------
+func (h *FactoryHandler) parseBookAddrFromReceipt(ctx context.Context, factory common.Address, receipt *types.Receipt) (common.Address, error) {
+	// 1) 可选：按 topic0 精确匹配
+	topic0Env := strings.TrimSpace(os.Getenv("BOOK_CREATED_EVENT_TOPIC0")) // 例如 0xabc...
+	var wantTopic0 common.Hash
+	hasTopic0 := false
+	if topic0Env != "" {
+		topic0Env = strings.TrimPrefix(strings.ToLower(topic0Env), "0x")
+		if len(topic0Env) == 64 {
+			b, err := hex.DecodeString(topic0Env)
+			if err == nil && len(b) == 32 {
+				copy(wantTopic0[:], b)
+				hasTopic0 = true
+			}
+		}
+	}
+
+	// topic1 位置（默认 1，代表 Topics[1] 是 bookAddr）
+	topicPos := 1
+	if v := strings.TrimSpace(os.Getenv("BOOK_CREATED_BOOK_TOPIC_POS")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 1 && n <= 3 {
+			topicPos = n
+		}
+	}
+
+	// 2) 扫 logs 找候选地址
+	var candidates []common.Address
+	for _, lg := range receipt.Logs {
+		if lg == nil {
+			continue
+		}
+		if lg.Address != factory {
+			continue
+		}
+		if len(lg.Topics) <= topicPos {
+			continue
+		}
+		if hasTopic0 && lg.Topics[0] != wantTopic0 {
+			continue
+		}
+		addr := common.BytesToAddress(lg.Topics[topicPos].Bytes())
+		if addr == (common.Address{}) {
+			continue
+		}
+		candidates = append(candidates, addr)
+	}
+
+	// 3) 兜底：如果没有任何候选且未配置 topic0，则尝试“第一个来自 factory 的 log”
+	if len(candidates) == 0 && !hasTopic0 {
+		for _, lg := range receipt.Logs {
+			if lg == nil {
+				continue
+			}
+			if lg.Address != factory {
+				continue
+			}
+			if len(lg.Topics) >= 2 {
+				addr := common.BytesToAddress(lg.Topics[1].Bytes())
+				if addr != (common.Address{}) {
+					candidates = append(candidates, addr)
+					break
+				}
+			}
+		}
+	}
+
+	if len(candidates) == 0 {
+		return common.Address{}, errors.New("receipt logs 中未找到可解析的 bookAddr（建议在 factory 合约 emit BookCreated，并配置 BOOK_CREATED_EVENT_TOPIC0）")
+	}
+
+	// 4) 验证候选地址确实是合约（code != 0x）
+	for _, c := range candidates {
+		code, err := h.Client.CodeAt(ctx, c, nil)
+		if err == nil && len(code) > 0 {
+			return c, nil
+		}
+	}
+	return common.Address{}, errors.New("找到了候选地址，但 CodeAt 校验都不是合约（code=0x）；请确认 factory 是否 emit 了包含 bookAddr 的事件并且 bookAddr 是 indexed")
+}
+
+// -----------------------------
+// 写入 Redis：vault:book:meta:<bookAddr> 以及辅助索引（可选）
+// -----------------------------
+func (h *FactoryHandler) saveBookMeta(ctx context.Context, bookAddr common.Address, req DeployBookReq) error {
+	bookKey := "vault:book:meta:" + strings.ToLower(bookAddr.Hex())
+	now := time.Now().Unix()
+
+	fields := map[string]interface{}{
+		"publisher": strings.ToLower(strings.TrimSpace(req.Publisher)),
+		"symbol":    strings.ToUpper(strings.TrimSpace(req.Symbol)),
+		"serial":    strings.TrimSpace(req.Serial),
+		"name":      strings.TrimSpace(req.Name),
+		"author":    strings.TrimSpace(req.Author),
+		"createdAt": now,
+	}
+
+	if err := h.RDB.HSet(ctx, bookKey, fields).Err(); err != nil {
+		return err
+	}
+
+	// 可选：给 publisher 维护一个书列表，方便你后续排查/分页（不影响 idx:books）
+	pub := strings.ToLower(strings.TrimSpace(req.Publisher))
+	listKey := "vault:publisher:books:" + pub
+	_ = h.RDB.ZAdd(ctx, listKey, redis.Z{Score: float64(now), Member: strings.ToLower(bookAddr.Hex())}).Err()
+
+	// 可选：初始化 mint / sales 统计 key（后续你排查 mint nft 总数会用到）
+	// 你可以在 mint handler 里 INCRBY 这些 key
+	_ = h.RDB.SetNX(ctx, "vault:book:minted:"+strings.ToLower(bookAddr.Hex()), 0, 0).Err()
+	_ = h.RDB.SetNX(ctx, "vault:book:sales:"+strings.ToLower(bookAddr.Hex()), 0, 0).Err()
+
+	return nil
 }
 
 // -----------------------------

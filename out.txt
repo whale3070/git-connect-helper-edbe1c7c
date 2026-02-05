@@ -1,61 +1,40 @@
-    return apiFetch<{ ok: boolean; txHash: string; bookAddr: string; error?: string }>(
-      `/api/v1/publisher/deploy-book`,
-      {
-        method: 'POST',
-        body: JSON.stringify(params),
-      },
-      async () => {
-        await mockDelay(2000);
-        const txHash = generateFakeTxHash();
-        return { ok: true, txHash, bookAddr: txHash };
-      }
-    );
-  }, [apiFetch]);
-
-  /**
-   * 获取出版社余额
-   * GET /api/v1/publisher/balance?address=xxx
-   */
-  const getPublisherBalance = useCallback(async (address: string) => {
-    return apiFetch<{ ok: boolean; balance: string; maxDeploys: number }>(
-      `/api/v1/publisher/balance?address=${encodeURIComponent(address)}`,
-      { method: 'GET' },
-      async () => {
-        await mockDelay(500);
-        return {
-          ok: true,
-          balance: (Math.random() * 200).toFixed(2),
-          maxDeploys: Math.floor(Math.random() * 20) + 5,
-        };
-      }
-    );
-  }, [apiFetch]);
-
-  // ========== 分析相关 API ==========
-
-  /**
-   * 获取热力图数据
-   * GET /api/v1/analytics/heatmap
-   * Response: { ok: true, regions: [...] }
-   */
-  const fetchHeatmapData = useCallback(async () => {
-    return apiFetch<{ ok: boolean; regions: Array<{ name: string; value: [number, number, number] }> }>(
-      `/api/v1/analytics/heatmap`,
-      { method: 'GET' },
-      async () => {
-        await mockDelay(300);
-        return {
-          ok: true,
-          regions: MOCK_REGIONS,
-        };
-      }
-    );
-  }, [apiFetch]);
-
-  /**
-   * 获取书籍/市场数据
-   * GET /api/v1/market/tickers
-   */
-  const fetchBooks = useCallback(async (page = 1) => {
-    return apiFetch<{ data: typeof MOCK_BOOKS; total: number; page: number }>(
-      `/api/v1/market/tickers?page=${page}`,
+src/admin/TopUpPage.tsx:68: * POST /api/admin/usdt/recharge
+src/admin/TopUpPage.tsx:336:      const url = `${base}/api/admin/usdt/recharge`.replace(/^\/api/, "/api").replace("//api", "/api");
+src/admin/TopUpPage.tsx:338:      const res = await fetch(url, {
+src/admin/TopUpPage.tsx:390:          注：当前已接入后端 Demo：<b>管理员代充 USDT（/api/admin/usdt/recharge）</b>；其他资产仍为前端演示占位。
+src/admin/PublisherAdminLayout.tsx:168:    const url = `${base}/api/v1/analytics/distribution`;
+src/admin/PublisherAdminLayout.tsx:169:    const res = await fetch(url, { method: "GET" });
+src/admin/PublisherAdminLayout.tsx:210:        const url = `${base}/api/v1/publisher/books/search?publisher=${publisher}&q=${encodeURIComponent(
+src/admin/PublisherAdminLayout.tsx:214:        const res = await fetch(url, { method: "GET" });
+src/admin/PublisherAdminLayout.tsx:424:      const url = `${apiBaseUrl.replace(/\/$/, "")}/api/v1/publisher/deploy-book`;
+src/admin/PublisherAdminLayout.tsx:425:      const res = await fetch(url, {
+src/admin/PublisherAdminLayout.tsx:514:      const url = `${apiBaseUrl.replace(/\/$/, "")}/api/v1/publisher/zip?count=${encodeURIComponent(
+src/admin/PublisherAdminLayout.tsx:518:      const res = await fetch(url, { method: "GET" });
+src/hooks/useApi.ts:43:      const res = await fetch(url, {
+src/hooks/useApi.ts:259:   * GET /api/v1/publisher/balance?publisher=0x...&codeHash=xxx
+src/hooks/useApi.ts:268:        `/api/v1/publisher/balance?publisher=${encodeURIComponent(publisher)}&address=${encodeURIComponent(
+src/hooks/useApi.ts:325:  // 如果你之后要做“无 privKey”的部署，请在 PublisherAdminLayout 里继续用你现在的 POST /api/v1/publisher/deploy-book（后端从 Redis 取私钥）。
+src/hooks/useApi.ts:330:   * 真实后端：GET /api/v1/analytics/distribution
+src/hooks/useApi.ts:334:      `/api/v1/analytics/distribution`,
+src/hooks/useApi.ts:344:   * 市场数据：GET /api/v1/market/tickers
+src/hooks/useApi.ts:349:        `/api/v1/market/tickers?page=${encodeURIComponent(String(page))}`,
+src/components/SalesBoard.tsx:19:      const res = await fetch(`${BACKEND_URL}/metrics/mint`)
+src/App.tsx:38:      const response = await fetch(
+src/pages/onetime_Reward.tsx:30:      const response = await fetch('/relay/reward', {
+src/pages/Heatmap.tsx:73:        const geoJsonRes = await fetch('/world.json');
+src/pages/Publisher.tsx:38:// ✅ 后端热力图接口实际是 /api/v1/analytics/distribution（兼容之前前端叫 heatmap 的概念）
+src/pages/Publisher.tsx:41:  const url = `${base}/api/v1/analytics/distribution`;
+src/pages/Publisher.tsx:42:  const res = await fetch(url, { method: "GET" });
+src/pages/Publisher.tsx:139:// REAL 模式：debounce 300ms 搜索出版社书籍（/api/v1/publisher/books/search）
+src/pages/Publisher.tsx:159:      const url = `${base}/api/v1/publisher/books/search?publisher=${publisher}&q=${encodeURIComponent(q)}&limit=20&offset=0`;
+src/pages/Publisher.tsx:161:      const res = await fetch(url, { method: "GET" });
+src/pages/Publisher.tsx:305:const url = `${apiBaseUrl.replace(/\/$/, "")}/api/v1/publisher/deploy-book`;
+src/pages/Publisher.tsx:306:      const res = await fetch(url, {
+src/pages/Publisher.tsx:376:      // ⚠️ 这里假设后端路由为：GET {apiBaseUrl}/api/v1/publisher/zip?count=100&contract=0x...
+src/pages/Publisher.tsx:378:      const url = `${apiBaseUrl.replace(/\/$/, "")}/api/v1/publisher/zip?count=${encodeURIComponent(String(n))}&contract=${encodeURIComponent(contractAddr)}`;
+src/pages/Publisher.tsx:380:      const res = await fetch(url, { method: "GET" });
+src/pages/AdminDashboard.tsx:27:          fetch(`http://localhost:8080/api/v1/stats/sales?address=${address}`),
+src/pages/AdminDashboard.tsx:28:          fetch(`http://localhost:8080/api/v1/analytics/distribution?address=${address}`)
+src/pages/input_hashcode_Reward.tsx:13:      const res = await fetch(`/relay/get-saved?address=${address}`);
+src/pages/input_hashcode_Reward.tsx:34:      const response = await fetch('/relay/save-code', {
+src/pages/input_hashcode_Reward.tsx:59:      const response = await fetch('/relay/reward', {

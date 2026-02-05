@@ -10,7 +10,7 @@ const Reward: React.FC = () => {
   const fetchSavedCodes = async (address: string) => {
     if (!address.startsWith('0x') || address.length < 42) return;
     try {
-      const res = await fetch(`http://198.55.109.102:8080/relay/get-saved?address=${address}`);
+      const res = await fetch(`/relay/get-saved?address=${address}`);
       const data = await res.json();
       if (data.codes && Array.isArray(data.codes)) {
         const newCodes = ['', '', '', '', ''];
@@ -31,7 +31,7 @@ const Reward: React.FC = () => {
     }
 
     try {
-      const response = await fetch('http://198.55.109.102:8080/relay/save-code', {
+      const response = await fetch('/relay/save-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ address: walletAddress, codeHash: code })
@@ -56,7 +56,7 @@ const Reward: React.FC = () => {
     setResult(null);
 
     try {
-      const response = await fetch('http://198.55.109.102:8080/relay/reward', {
+      const response = await fetch('/relay/reward', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -64,7 +64,7 @@ func (h *PublisherHandler) GenerateAndDownloadZip(w http.ResponseWriter, r *http
 		code := "0x" + hex.EncodeToString(b)
 		generatedCodes = append(generatedCodes, code)
 
-		qrUrl := fmt.Sprintf("http://whale3070.com/valut_mint_nft/%s", code)
+		qrUrl := fmt.Sprintf("http://whale3070.com/vault_mint_nft/%s", code)
 		if bookID != "" {
 			qrUrl = qrUrl + "?book_id=" + bookID
 		}
@@ -98,7 +98,16 @@ func (h *PublisherHandler) GenerateAndDownloadZip(w http.ResponseWriter, r *http
 
 	_ = zipWriter.Close()
 	w.Header().Set("Content-Type", "application/zip")
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=WhaleVault_Codes_%d.zip", count))
+	ts := time.Now().Format("20060102_150405") // 例如 20260206_001233
+w.Header().Set(
+	"Content-Disposition",
+	fmt.Sprintf(
+		"attachment; filename=WhaleVault_Codes_%d_%s.zip",
+		count,
+		ts,
+	),
+)
+
 	_, _ = w.Write(zipBuf.Bytes())
 }
 

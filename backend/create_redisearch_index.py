@@ -1,7 +1,7 @@
 import redis
 
 REDIS_HOST = "127.0.0.1"
-REDIS_PORT = 6380   # 你的 redis-stack
+REDIS_PORT = 6379   # 你的 redis-stack
 REDIS_DB = 0
 
 r = redis.Redis(

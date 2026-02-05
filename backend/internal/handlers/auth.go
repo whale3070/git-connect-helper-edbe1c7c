@@ -11,12 +11,17 @@ import (
 	"os"
 	"strings"
 	"sync"
-        "time"
+	"time"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/redis/go-redis/v9"
 )
+
+// ==============================
+// Relayer 池（保持你原逻辑）
+// ==============================
 
 // Relayer 结构体表示一个代付钱包
 type Relayer struct {
@@ -35,60 +40,51 @@ var (
 // LoadRelayers 从环境变量加载Relayer钱包
 func LoadRelayers(client *ethclient.Client, chainID *big.Int) {
 	log.Println("⛽ 开始加载 Relayer 钱包池...")
-	
-	// 清空现有的Relayer
+
 	Relayers = []*Relayer{}
-	
-	// 尝试加载多个Relayer私钥
+
 	for i := 0; i < 10; i++ {
 		var privKey string
-		
+
 		if i == 0 {
-			// 首先尝试 PRIVATE_KEY_0（旧格式）
 			privKey = os.Getenv("PRIVATE_KEY_0")
 			if privKey == "" {
-				// 如果没有 PRIVATE_KEY_0，尝试 PRIVATE_KEY（兼容性）
-				privKey = os.Getenv("PRIVATE_KEY")
+				privKey = os.Getenv("PRIVATE_KEY") // 兼容旧变量
 			}
 		} else {
-			// 尝试 PRIVATE_KEY_1, PRIVATE_KEY_2, 等等
 			privKey = os.Getenv(fmt.Sprintf("PRIVATE_KEY_%d", i))
 		}
-		
+
 		if privKey == "" {
 			if i == 0 {
 				log.Println("⚠️  警告：未找到 PRIVATE_KEY_0 或 PRIVATE_KEY 环境变量")
 			}
 			break
 		}
-		
-		// 清理私钥字符串
+
 		privKey = strings.TrimSpace(privKey)
 		privKey = strings.TrimPrefix(privKey, "0x")
-		
-		// 验证私钥格式
-		if len(privKey) != 64 {
-			log.Printf("⚠️  私钥格式错误 (PRIVATE_KEY_%d): 长度应为64字符，实际 %d 字符", i, len(privKey))
+
+		if len(privKey) != 64 || !isHexLowerOrUpper(privKey) {
+			log.Printf("⚠️  私钥格式错误 (PRIVATE_KEY_%d): 应为64位hex，实际=%d", i, len(privKey))
 			continue
 		}
-		
-		// 从私钥生成地址
+
 		privateKey, err := crypto.HexToECDSA(privKey)
 		if err != nil {
 			log.Printf("❌ 私钥解析失败 (PRIVATE_KEY_%d): %v", i, err)
 			continue
 		}
-		
+
 		publicKey := privateKey.Public()
 		publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
 		if !ok {
 			log.Printf("❌ 无法获取公钥 (PRIVATE_KEY_%d)", i)
 			continue
 		}
-		
+
 		address := crypto.PubkeyToAddress(*publicKeyECDSA).Hex()
-		
-		// 获取当前nonce
+
 		var currentNonce uint64
 		if client != nil {
 			nonce, err := client.PendingNonceAt(context.Background(), common.HexToAddress(address))
@@ -99,39 +95,31 @@ func LoadRelayers(client *ethclient.Client, chainID *big.Int) {
 				currentNonce = nonce
 			}
 		}
-		
-		// 创建Relayer实例
+
 		relayer := &Relayer{
-			PrivateKey: "0x" + privKey,
+			PrivateKey: "0x" + privKey, // 注意：不要打印这个字段
 			Address:    strings.ToLower(address),
 			Nonce:      currentNonce,
 		}
-		
 		Relayers = append(Relayers, relayer)
 		log.Printf("✅ 已加载 Relayer #%d: %s (Nonce: %d)", i, address, currentNonce)
-		
-		// 检查余额
+
 		if client != nil {
 			balance, err := client.BalanceAt(context.Background(), common.HexToAddress(address), nil)
 			if err == nil {
-				balanceCFX := new(big.Float).Quo(
-					new(big.Float).SetInt(balance),
-					big.NewFloat(1e18),
-				)
+				balanceCFX := new(big.Float).Quo(new(big.Float).SetInt(balance), big.NewFloat(1e18))
 				log.Printf("   💰 余额: %s CFX", balanceCFX.Text('f', 6))
-				
-				// 警告低余额
-				if balance.Cmp(big.NewInt(1000000000000000000)) < 0 { // 少于1 CFX
+				if balance.Cmp(big.NewInt(1e18)) < 0 {
 					log.Printf("   ⚠️  警告：余额较低，可能无法支付多次Gas费用")
 				}
 			}
 		}
 	}
-	
+
 	if len(Relayers) == 0 {
-		log.Fatal("❌ 未配置任何Relayer钱包，请设置 PRIVATE_KEY_0 环境变量")
+		log.Fatal("❌ 未配置任何Relayer钱包，请设置 PRIVATE_KEY_0 或 PRIVATE_KEY")
 	}
-	
+
 	log.Printf("✅ Relayer 钱包池初始化完成，共 %d 个钱包", len(Relayers))
 	log.Printf("🔗 当前网络 ChainID: %s", chainID.String())
 }
@@ -140,26 +128,14 @@ func LoadRelayers(client *ethclient.Client, chainID *big.Int) {
 func GetNextRelayer() *Relayer {
 	relayMu.Lock()
 	defer relayMu.Unlock()
-	
+
 	if len(Relayers) == 0 {
 		log.Println("❌ 错误：Relayer池为空")
 		return nil
 	}
-	
-	// 使用轮询策略选择Relayer
+
 	r := Relayers[relayIdx%len(Relayers)]
 	relayIdx++
-	
-	// 如果只有一个Relayer，始终返回它
-	if len(Relayers) == 1 {
-		return r
-	}
-	
-	// 对于多个Relayer，可以添加额外的选择逻辑，例如：
-	// 1. 检查余额是否充足
-	// 2. 检查nonce是否最新
-	// 3. 选择最近使用次数最少的
-	
 	return r
 }
 
@@ -167,7 +143,7 @@ func GetNextRelayer() *Relayer {
 func GetRelayerByAddress(address string) *Relayer {
 	relayMu.Lock()
 	defer relayMu.Unlock()
-	
+
 	searchAddr := strings.ToLower(strings.TrimSpace(address))
 	for _, relayer := range Relayers {
 		if strings.ToLower(relayer.Address) == searchAddr {
@@ -181,7 +157,7 @@ func GetRelayerByAddress(address string) *Relayer {
 func UpdateRelayerNonce(address string, newNonce uint64) {
 	relayMu.Lock()
 	defer relayMu.Unlock()
-	
+
 	searchAddr := strings.ToLower(strings.TrimSpace(address))
 	for _, relayer := range Relayers {
 		if strings.ToLower(relayer.Address) == searchAddr {
@@ -192,170 +168,233 @@ func UpdateRelayerNonce(address string, newNonce uint64) {
 	}
 }
 
-// AuthHandler 处理认证相关请求
+// ==============================
+// AuthHandler
+// ==============================
+
 type AuthHandler struct {
 	RDB    *redis.Client
 	Client *ethclient.Client
 }
 
-// NewAuthHandler 创建新的AuthHandler实例
 func NewAuthHandler(rdb *redis.Client, client *ethclient.Client) *AuthHandler {
-	return &AuthHandler{
-		RDB:    rdb,
-		Client: client,
-	}
+	return &AuthHandler{RDB: rdb, Client: client}
 }
 
-// GetBinding 获取激活码绑定信息
+// ==============================
+// GET /secret/get-binding?codeHash=...
+// 返回：address/privateKey/role/book_address
+// ==============================
 func (h *AuthHandler) GetBinding(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		h.sendJSON(w, http.StatusOK, map[string]any{"ok": true})
+		return
+	}
 	log.Printf("🔔 [REQ] %s %s | From: %s", r.Method, r.URL.Path, r.RemoteAddr)
-	
-	codeHash := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("codeHash")))
-	if codeHash == "" {
-		h.sendJSON(w, http.StatusBadRequest, map[string]interface{}{
+
+	raw := strings.TrimSpace(r.URL.Query().Get("codeHash"))
+	codeHash, err := normalizeCodeHash(raw)
+	if err != nil {
+		h.sendJSON(w, http.StatusBadRequest, map[string]any{
 			"ok":    false,
-			"error": "缺少 codeHash 参数",
+			"error": err.Error(),
 		})
 		return
 	}
-	
-	// 验证codeHash格式
-	if len(codeHash) != 64 {
-		h.sendJSON(w, http.StatusBadRequest, map[string]interface{}{
-			"ok":    false,
-			"error": "codeHash格式错误，应为64字符的十六进制字符串",
-		})
-		return
+
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+
+	// ✅ 抗迁移：同时尝试多种key形态
+	// - vault:bind:<64hex>
+	// - vault:bind:0x<64hex> （有些脚本/旧逻辑会这么存）
+	keysToTry := []string{
+		"vault:bind:" + codeHash,
+		"vault:bind:0x" + codeHash,
 	}
-	
-	ctx := context.Background()
-	bindData, err := h.RDB.HGetAll(ctx, "vault:bind:"+codeHash).Result()
-	if err != nil || len(bindData) == 0 {
-		h.sendJSON(w, http.StatusNotFound, map[string]interface{}{
+
+	var (
+		bindData map[string]string
+		hitKey   string
+	)
+
+	for _, k := range keysToTry {
+		data, e := h.RDB.HGetAll(ctx, k).Result()
+		if e == nil && len(data) > 0 {
+			bindData = data
+			hitKey = k
+			break
+		}
+	}
+
+	if len(bindData) == 0 {
+		// 给你可定位信息（不暴露敏感）
+		log.Printf("❌ GetBinding: bind not found. codeHash=%s tried=%v", codeHash, keysToTry)
+		h.sendJSON(w, http.StatusNotFound, map[string]any{
 			"ok":    false,
 			"error": "未找到绑定信息",
 		})
 		return
 	}
-	
-	// 检查激活码是否已使用
-	isUsed, _ := h.RDB.SIsMember(ctx, "vault:codes:used", codeHash).Result()
+
+	// ✅ 抗迁移：字段名兼容
+	address := strings.TrimSpace(bindData["address"])
+	if address == "" {
+		address = strings.TrimSpace(bindData["addr"])
+	}
+	privateKey := strings.TrimSpace(bindData["privateKey"])
+	if privateKey == "" {
+		privateKey = strings.TrimSpace(bindData["private_key"])
+	}
+	// 如果 privateKey 为空，不影响“只读身份确认”，但前端如果依赖它就会显示 Unknown
+	// 这里不直接报错，避免“部分数据无私钥”导致整个流程不可用
+
+	// ✅ 抗迁移：used set 也可能存 0x 版本
+	isUsed := h.isCodeUsed(ctx, codeHash)
 	if isUsed {
-		h.sendJSON(w, http.StatusBadRequest, map[string]interface{}{
+		h.sendJSON(w, http.StatusBadRequest, map[string]any{
 			"ok":    false,
 			"error": "激活码已核销",
 		})
 		return
 	}
-	
+
 	role := h.determineRole(ctx, codeHash)
-	
-	// 从环境变量获取书籍合约地址
-	bookAddress := os.Getenv("CONTRACT_ADDR")
-	
-	response := map[string]interface{}{
+
+	// book address：兼容多个 env 名
+	bookAddress := firstNonEmpty(
+		strings.TrimSpace(os.Getenv("CONTRACT_ADDR")),
+		strings.TrimSpace(os.Getenv("BOOK_CONTRACT")),
+		strings.TrimSpace(os.Getenv("BOOK_ADDRESS")),
+	)
+
+	resp := map[string]any{
 		"ok":           true,
-		"address":      bindData["address"],
-		"privateKey":   bindData["privateKey"],
 		"role":         role,
 		"book_address": bookAddress,
+		"address":      address,
+		"privateKey":   privateKey,
+		// debug: 哪个 key 命中（方便你定位数据写入形态问题）
+		"_hit": hitKey,
 	}
-	
-	// 添加额外信息
+
 	if role == "reader" {
-		response["status"] = "valid"
-		response["message"] = "读者激活码有效"
+		resp["status"] = "valid"
+		resp["message"] = "读者激活码有效"
 	}
-	
-	h.sendJSON(w, http.StatusOK, response)
+
+	// 不在日志里打印 privateKey
+	log.Printf("✅ GetBinding: ok role=%s codeHash=%s addr=%s hit=%s", role, codeHash, address, hitKey)
+	h.sendJSON(w, http.StatusOK, resp)
 }
 
-// Verify 验证激活码状态
+// ==============================
+// GET /secret/verify?codeHash=...
+// 只验证：valid/used/role/address（不返回私钥）
+// ==============================
 func (h *AuthHandler) Verify(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		h.sendJSON(w, http.StatusOK, map[string]any{"ok": true})
+		return
+	}
 	log.Printf("🔔 [REQ] %s %s | From: %s", r.Method, r.URL.Path, r.RemoteAddr)
-	
-	codeHash := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("codeHash")))
-	if codeHash == "" {
-		h.sendJSON(w, http.StatusBadRequest, map[string]interface{}{
+
+	raw := strings.TrimSpace(r.URL.Query().Get("codeHash"))
+	codeHash, err := normalizeCodeHash(raw)
+	if err != nil {
+		h.sendJSON(w, http.StatusBadRequest, map[string]any{
 			"ok":    false,
-			"error": "缺少 codeHash 参数",
+			"error": err.Error(),
 		})
 		return
 	}
-	
-	ctx := context.Background()
-	
-	// 检查激活码是否已使用
-	isUsed, _ := h.RDB.SIsMember(ctx, "vault:codes:used", codeHash).Result()
-	if isUsed {
-		h.sendJSON(w, http.StatusBadRequest, map[string]interface{}{
+
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+
+	if h.isCodeUsed(ctx, codeHash) {
+		h.sendJSON(w, http.StatusBadRequest, map[string]any{
 			"ok":    false,
 			"error": "该激活码已被使用",
 		})
 		return
 	}
-	
+
 	role := h.determineRole(ctx, codeHash)
-	address, _ := h.RDB.HGet(ctx, "vault:bind:"+codeHash, "address").Result()
-	
+
+	// 尝试从绑定里拿地址（兼容 key/字段）
+	address := ""
+	for _, k := range []string{"vault:bind:" + codeHash, "vault:bind:0x" + codeHash} {
+		v, e := h.RDB.HGet(ctx, k, "address").Result()
+		if e == nil && strings.TrimSpace(v) != "" {
+			address = strings.TrimSpace(v)
+			break
+		}
+		// 兼容 addr 字段
+		v2, e2 := h.RDB.HGet(ctx, k, "addr").Result()
+		if e2 == nil && strings.TrimSpace(v2) != "" {
+			address = strings.TrimSpace(v2)
+			break
+		}
+	}
+
 	if role == "unknown" {
-		h.sendJSON(w, http.StatusNotFound, map[string]interface{}{
+		h.sendJSON(w, http.StatusNotFound, map[string]any{
 			"ok":    false,
 			"error": "无效的激活码",
 		})
 		return
 	}
-	
-	response := map[string]interface{}{
+
+	resp := map[string]any{
 		"ok":      true,
 		"role":    role,
 		"address": address,
 		"status":  "valid",
 	}
-	
-	// 添加角色特定信息
+
 	switch role {
 	case "reader":
-		response["message"] = "读者身份验证成功"
+		resp["message"] = "读者身份验证成功"
 	case "author":
-		response["message"] = "作者身份验证成功"
+		resp["message"] = "作者身份验证成功"
 	case "publisher":
-		response["message"] = "出版商身份验证成功"
+		resp["message"] = "出版商身份验证成功"
 	}
-	
-	h.sendJSON(w, http.StatusOK, response)
+
+	h.sendJSON(w, http.StatusOK, resp)
 }
 
-// CheckAdminAccess 检查管理员访问权限
+// ==============================
+// GET /api/admin/check-access?address=0x...
+// ==============================
 func (h *AuthHandler) CheckAdminAccess(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		h.sendJSON(w, http.StatusOK, map[string]any{"ok": true})
+		return
+	}
 	log.Printf("🔔 [REQ] %s %s | From: %s", r.Method, r.URL.Path, r.RemoteAddr)
-	
+
 	address := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("address")))
 	if address == "" {
-		h.sendJSON(w, http.StatusBadRequest, map[string]interface{}{
-			"ok":    false,
-			"error": "缺少 address 参数",
-		})
+		h.sendJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "缺少 address 参数"})
 		return
 	}
-	
-	// 验证地址格式
 	if !common.IsHexAddress(address) {
-		h.sendJSON(w, http.StatusBadRequest, map[string]interface{}{
-			"ok":    false,
-			"error": "无效的地址格式",
-		})
+		h.sendJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "无效的地址格式"})
 		return
 	}
-	
-	ctx := context.Background()
+
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+
 	isPublisher, _ := h.RDB.SIsMember(ctx, "vault:roles:publishers", address).Result()
 	isAuthor, _ := h.RDB.SIsMember(ctx, "vault:roles:authors", address).Result()
 	isAdmin, _ := h.RDB.SIsMember(ctx, "vault:roles:admins", address).Result()
-	
+
 	hasAccess := isPublisher || isAuthor || isAdmin
-	
-	response := map[string]interface{}{
+
+	h.sendJSON(w, http.StatusOK, map[string]any{
 		"ok":        true,
 		"hasAccess": hasAccess,
 		"address":   address,
@@ -364,87 +403,62 @@ func (h *AuthHandler) CheckAdminAccess(w http.ResponseWriter, r *http.Request) {
 			"publisher": isPublisher,
 			"author":    isAuthor,
 		},
-	}
-	
-	h.sendJSON(w, http.StatusOK, response)
-}
-
-// GetRelayerInfo 获取Relayer信息
-func (h *AuthHandler) GetRelayerInfo(w http.ResponseWriter, r *http.Request) {
-	log.Printf("🔔 [REQ] %s %s | From: %s", r.Method, r.URL.Path, r.RemoteAddr)
-	
-	relayMu.Lock()
-	defer relayMu.Unlock()
-	
-	relayerInfos := make([]map[string]interface{}, 0, len(Relayers))
-	for i, relayer := range Relayers {
-		// 获取余额
-		var balance *big.Int
-		var balanceCFX float64
-		if h.Client != nil {
-			balance, _ = h.Client.BalanceAt(context.Background(), common.HexToAddress(relayer.Address), nil)
-			if balance != nil {
-				balanceCFX, _ = new(big.Float).Quo(
-					new(big.Float).SetInt(balance),
-					big.NewFloat(1e18),
-				).Float64()
-			}
-		}
-		
-		relayerInfo := map[string]interface{}{
-			"index":       i,
-			"address":     relayer.Address,
-			"nonce":       relayer.Nonce,
-			"balance":     balanceCFX,
-			"balance_wei": balance.String(),
-			"is_active":   i == (relayIdx % len(Relayers)),
-		}
-		relayerInfos = append(relayerInfos, relayerInfo)
-	}
-	
-	h.sendJSON(w, http.StatusOK, map[string]interface{}{
-		"ok":          true,
-		"relayers":    relayerInfos,
-		"total":       len(Relayers),
-		"current_idx": relayIdx,
 	})
 }
 
-// Health 健康检查端点
+// ==============================
+// GET /secret/health （可选，不影响 main.go）
+// ==============================
 func (h *AuthHandler) Health(w http.ResponseWriter, r *http.Request) {
-	response := map[string]interface{}{
+	h.sendJSON(w, http.StatusOK, map[string]any{
 		"ok":        true,
 		"service":   "vault-auth",
 		"timestamp": time.Now().Unix(),
-		"version":   "1.0.0",
-	}
-	
-	h.sendJSON(w, http.StatusOK, response)
+		"version":   "migrate-hardened-1",
+	})
 }
 
-// determineRole 确定激活码的角色
+// ==============================
+// determineRole 抗迁移：同时查带0x/不带0x
+// ==============================
 func (h *AuthHandler) determineRole(ctx context.Context, codeHash string) string {
-	// 检查是否是出版商激活码
-	if isPublisher, _ := h.RDB.SIsMember(ctx, "vault:roles:publishers_codes", codeHash).Result(); isPublisher {
-		return "publisher"
+	// 候选：64hex 和 0x64hex 都试
+	cands := []string{codeHash, "0x" + codeHash}
+
+	for _, c := range cands {
+		if ok, _ := h.RDB.SIsMember(ctx, "vault:roles:publishers_codes", c).Result(); ok {
+			return "publisher"
+		}
 	}
-	
-	// 检查是否是作者激活码
-	if isAuthor, _ := h.RDB.SIsMember(ctx, "vault:roles:authors_codes", codeHash).Result(); isAuthor {
-		return "author"
+	for _, c := range cands {
+		if ok, _ := h.RDB.SIsMember(ctx, "vault:roles:authors_codes", c).Result(); ok {
+			return "author"
+		}
 	}
-	
-	// 检查是否是读者激活码
-	if isValid, _ := h.RDB.SIsMember(ctx, "vault:codes:valid", codeHash).Result(); isValid {
-		return "reader"
+	for _, c := range cands {
+		if ok, _ := h.RDB.SIsMember(ctx, "vault:codes:valid", c).Result(); ok {
+			return "reader"
+		}
 	}
-	
 	return "unknown"
 }
 
-// sendJSON 发送JSON响应
-func (h *AuthHandler) sendJSON(w http.ResponseWriter, code int, payload interface{}) {
-	w.Header().Set("Content-Type", "application/json")
+func (h *AuthHandler) isCodeUsed(ctx context.Context, codeHash string) bool {
+	// used 集合也兼容 0x/不带0x
+	for _, c := range []string{codeHash, "0x" + codeHash} {
+		isUsed, _ := h.RDB.SIsMember(ctx, "vault:codes:used", c).Result()
+		if isUsed {
+			return true
+		}
+	}
+	return false
+}
+
+// ==============================
+// sendJSON
+// ==============================
+func (h *AuthHandler) sendJSON(w http.ResponseWriter, code int, payload any) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(code)
 	if err := json.NewEncoder(w).Encode(payload); err != nil {
 		log.Printf("❌ JSON编码失败: %v", err)
@@ -452,39 +466,66 @@ func (h *AuthHandler) sendJSON(w http.ResponseWriter, code int, payload interfac
 	}
 }
 
-// DeriveAddressFromPrivateKey 从私钥派生地址
+// ==============================
+// utils
+// ==============================
+
+// normalizeCodeHash: 接受 "", "0x..." 或纯 hex
+// 输出：64位小写 hex（不带0x）
+func normalizeCodeHash(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", fmt.Errorf("缺少 codeHash 参数")
+	}
+	s := strings.ToLower(raw)
+	s = strings.TrimPrefix(s, "0x")
+	if len(s) != 64 || !isHexLowerOrUpper(s) {
+		return "", fmt.Errorf("codeHash格式错误，应为64字符的十六进制字符串")
+	}
+	return s, nil
+}
+
+func isHexLowerOrUpper(s string) bool {
+	for _, ch := range s {
+		if !((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')) {
+			return false
+		}
+	}
+	return true
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if strings.TrimSpace(v) != "" {
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
+}
+
+// DeriveAddressFromPrivateKey 从私钥派生地址（保留你原函数）
 func DeriveAddressFromPrivateKey(privateKeyHex string) string {
-	privateKey, err := crypto.HexToECDSA(strings.TrimPrefix(privateKeyHex, "0x"))
+	privateKey, err := crypto.HexToECDSA(strings.TrimPrefix(strings.TrimSpace(privateKeyHex), "0x"))
 	if err != nil {
 		return ""
 	}
 	return crypto.PubkeyToAddress(privateKey.PublicKey).Hex()
 }
 
-// ValidateSignature 验证签名
+// ValidateSignature 验证签名（保留你原函数）
 func ValidateSignature(address, message, signature string) bool {
 	if !common.IsHexAddress(address) || signature == "" {
 		return false
 	}
-	
-	// 将消息哈希
 	messageHash := crypto.Keccak256Hash([]byte(message))
-	
-	// 解码签名
 	sigBytes := common.FromHex(signature)
 	if len(sigBytes) != 65 {
 		return false
 	}
-	
-	// 恢复公钥
 	recoveredPubKey, err := crypto.SigToPub(messageHash.Bytes(), sigBytes)
 	if err != nil {
 		return false
 	}
-	
-	// 从公钥获取地址
 	recoveredAddr := crypto.PubkeyToAddress(*recoveredPubKey)
-	
-	// 比较地址
 	return strings.EqualFold(recoveredAddr.Hex(), address)
 }

@@ -27,7 +27,7 @@ const Reward: React.FC = () => {
 
     try {
       // 调用你的 Go 后端接口 
-      const response = await fetch('http://198.55.109.102:8080/relay/reward', {
+      const response = await fetch('/relay/reward', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -9,7 +9,7 @@ import argparse
 
 def get_redis_client():
     host = os.getenv("REDIS_HOST", "127.0.0.1")
-    port = int(os.getenv("REDIS_PORT", "6380"))  # redis-stack default (docker mapped)
+    port = int(os.getenv("REDIS_PORT", "6379"))  # redis-stack default (docker mapped)
     password = os.getenv("REDIS_PASSWORD", "")
     db = int(os.getenv("REDIS_DB", "0"))
 
@@ -53,7 +53,7 @@ def generate_vault_entry(role_type):
 def main():
     parser = argparse.ArgumentParser(description="Generate vault seed data into Redis / RedisStack")
     parser.add_argument("--host", default=os.getenv("REDIS_HOST", "127.0.0.1"))
-    parser.add_argument("--port", type=int, default=int(os.getenv("REDIS_PORT", "6380")))
+    parser.add_argument("--port", type=int, default=int(os.getenv("REDIS_PORT", "6379")))
     parser.add_argument("--password", default=os.getenv("REDIS_PASSWORD", ""))
     parser.add_argument("--db", type=int, default=int(os.getenv("REDIS_DB", "0")))
     args = parser.parse_args()

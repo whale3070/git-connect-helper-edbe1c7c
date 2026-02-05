@@ -25,7 +25,7 @@ export type PublisherOutletContext = {
   // env / header
   envMode: "real" | "mock";
   toggleEnvMode: () => void;
-  apiBaseUrl: string;
+  apiBaseUrl: string; // (kept for compatibility, but API calls below do NOT rely on it)
   pubAddress: string;
 
   // balance (CFX from backend)
@@ -90,9 +90,68 @@ const shortenAddress = (addr: string) => {
 };
 const isHexAddress = (addr: string) => /^0x[a-fA-F0-9]{40}$/.test((addr || "").trim());
 
+/**
+ * ✅ IMPORTANT FIX:
+ * Never construct API URLs using a route prefix like "/publisher-admin".
+ * Always call backend with an absolute path (starting with "/") or full origin.
+ * This prevents requests like "/publisher-admin/api/v1/..." which would be swallowed by SPA fallback and return index.html.
+ */
+const origin = () => (typeof window !== "undefined" ? window.location.origin : "");
+
+/**
+ * Parse filename from Content-Disposition.
+ * - Supports: filename="a.zip"
+ * - Supports: filename*=UTF-8''a%20b.zip
+ */
+const pickFilenameFromContentDisposition = (cd: string, fallback: string) => {
+  if (!cd) return fallback;
+
+  const mStar = cd.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
+  if (mStar?.[1]) {
+    try {
+      return decodeURIComponent(mStar[1].trim());
+    } catch {
+      return mStar[1].trim();
+    }
+  }
+
+  const m = cd.match(/filename\s*=\s*([^;]+)/i);
+  if (m?.[1]) return m[1].trim().replace(/^"|"$/g, "");
+
+  return fallback;
+};
+
+async function fetchJsonOrThrow<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, init);
+  const ct = (res.headers.get("content-type") || "").toLowerCase();
+
+  // Read text once for better error messages; then parse if JSON
+  const text = await res.text().catch(() => "");
+  const preview = text.slice(0, 300);
+
+  const isJson = ct.includes("application/json");
+  let data: any = null;
+  if (isJson && text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      // fallthrough
+    }
+  }
+
+  if (!res.ok) {
+    const msg = data?.error || data?.message || preview || `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+  if (!isJson) {
+    throw new Error(`响应格式错误: 期望 JSON，但得到 ${ct || "unknown"}: ${preview}`);
+  }
+  return (data as T) ?? ({} as T);
+}
+
 export default function PublisherAdminLayout() {
   const navigate = useNavigate();
-  const { apiBaseUrl } = useAppMode();
+  const { apiBaseUrl } = useAppMode(); // keep as-is for UI/context; do NOT rely on it for URL building
   const { getPublisherBalance, getErc20Balance } = useApi();
 
   const [loading, setLoading] = useState(true);
@@ -162,16 +221,10 @@ export default function PublisherAdminLayout() {
     localStorage.setItem(storageKey, JSON.stringify(books));
   };
 
-  // distribution
+  // ✅ distribution (always call absolute URL)
   const fetchDistribution = async () => {
-    const base = apiBaseUrl.replace(/\/$/, "");
-    const url = `${base}/api/v1/analytics/distribution`;
-    const res = await fetch(url, { method: "GET" });
-    if (!res.ok) {
-      const msg = await res.text().catch(() => "");
-      return { ok: false, error: msg || `HTTP ${res.status}` };
-    }
-    return res.json();
+    const url = `${origin()}/api/v1/analytics/distribution`;
+    return fetchJsonOrThrow<{ ok: boolean; regions?: any[]; error?: string }>(url, { method: "GET" });
   };
 
   // 切换 env 时读取各自 storage
@@ -206,17 +259,11 @@ export default function PublisherAdminLayout() {
         }
 
         setBookSearchLoading(true);
-        const base = apiBaseUrl.replace(/\/$/, "");
-        const url = `${base}/api/v1/publisher/books/search?publisher=${publisher}&q=${encodeURIComponent(
+        const url = `${origin()}/api/v1/publisher/books/search?publisher=${publisher}&q=${encodeURIComponent(
           q
         )}&limit=20&offset=0`;
 
-        const res = await fetch(url, { method: "GET" });
-        if (!res.ok) {
-          const msg = await res.text().catch(() => "");
-          throw new Error(msg || `HTTP ${res.status}`);
-        }
-        const data = await res.json();
+        const data = await fetchJsonOrThrow<any>(url, { method: "GET" });
         setBookCandidates(Array.isArray(data.items) ? data.items : []);
       } catch (e: any) {
         setBookCandidates([]);
@@ -227,7 +274,7 @@ export default function PublisherAdminLayout() {
     }, 300);
 
     return () => window.clearTimeout(timer);
-  }, [bookQuery, envMode, apiBaseUrl, pubAddress]);
+  }, [bookQuery, envMode, pubAddress]);
 
   // init
   useEffect(() => {
@@ -421,8 +468,8 @@ export default function PublisherAdminLayout() {
         throw new Error(`publisher 地址无效（需要 0x + 40 位十六进制）：${publisher}`);
       }
 
-      const url = `${apiBaseUrl.replace(/\/$/, "")}/api/v1/publisher/deploy-book`;
-      const res = await fetch(url, {
+      const url = `${origin()}/api/v1/publisher/deploy-book`;
+      const result = await fetchJsonOrThrow<any>(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -434,18 +481,6 @@ export default function PublisherAdminLayout() {
         }),
       });
 
-      const text = await res.text().catch(() => "");
-      let result: any = null;
-      try {
-        result = text ? JSON.parse(text) : null;
-      } catch {
-        // keep null
-      }
-
-      if (!res.ok) {
-        const msg = result?.error || text || `部署失败：HTTP ${res.status}`;
-        throw new Error(msg);
-      }
       if (!result?.ok) throw new Error(result?.error || "部署失败");
 
       // 后端可能会返回 bookAddr 为空（如果没等receipt解析事件），这里做兼容
@@ -511,9 +546,9 @@ export default function PublisherAdminLayout() {
         return;
       }
 
-      const url = `${apiBaseUrl.replace(/\/$/, "")}/api/v1/publisher/zip?count=${encodeURIComponent(
-        String(n)
-      )}&contract=${encodeURIComponent(contractAddr)}`;
+      const url = `${origin()}/api/v1/publisher/zip?count=${encodeURIComponent(String(n))}&contract=${encodeURIComponent(
+        contractAddr
+      )}`;
 
       const res = await fetch(url, { method: "GET" });
       if (!res.ok) {
@@ -524,9 +559,13 @@ export default function PublisherAdminLayout() {
       const blob = await res.blob();
       const dlUrl = window.URL.createObjectURL(blob);
 
+      // ✅ 同域名情况下 res.headers 直接可读；若未来跨域，也可在后端加 Expose-Headers
+      const cd = res.headers.get("content-disposition") || "";
+      const filename = pickFilenameFromContentDisposition(cd, `WhaleVault_Codes_${n}_${Date.now()}.zip`);
+
       const a = document.createElement("a");
       a.href = dlUrl;
-      a.download = `WhaleVault_Codes_${n}.zip`;
+      a.download = filename; // ✅ 不再写死，使用后端返回的带时间戳文件名
       document.body.appendChild(a);
       a.click();
       a.remove();

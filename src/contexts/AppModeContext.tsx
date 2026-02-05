@@ -35,7 +35,7 @@ export const AppModeProvider: React.FC<{ children: ReactNode }> = ({ children })
     isDevMode: mode === 'dev',
     toggleMode,
     setMode,
-    apiBaseUrl: mode === 'dev' ? 'http://198.55.109.102:8080' : '',
+    apiBaseUrl: mode === 'dev' ? '' : '',
   };
 
   return (
