@@ -185,12 +185,12 @@ func NewAuthHandler(rdb *redis.Client, client *ethclient.Client) *AuthHandler {
 // GET /secret/get-binding?codeHash=...
 // 返回：address/privateKey/role/book_address
 //
-// ✅ 本版修复/增强点：
-// 1) CORS 统一回显（避免前端把 CORS 当成“404”）
-// 2) bind 不存在时：
-//    - 若 code 是合法 reader 且未 used，则【自动生成临时钱包】并写入 vault:bind:* 后返回（自愈）
-//    - publisher/author 仍然返回 404（防止误授权）
-// 3) used 判定兼容：vault:codes:used (SET) + 旧的 vault:codes:<code> (HASH used=true)
+// ✅ FIX（你现在遇到的 bug 就在这）：
+// - 以前 book_address 只从 .env (CONTRACT_ADDR 等) 读取，导致你在 Redis 里绑定了 book_address / book_addr 也永远返回空。
+// - 现在优先级：
+//   1) vault:bind:<codeHash> 里的 book_address / book_addr
+//   2) vault:codes:book_addr 里 code -> book_addr 的映射（你 zip 生成时写入的）
+//   3) 环境变量 CONTRACT_ADDR / BOOK_CONTRACT / BOOK_ADDRESS（兜底）
 // ==============================
 func (h *AuthHandler) GetBinding(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodOptions {
@@ -256,11 +256,8 @@ func (h *AuthHandler) GetBinding(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			bookAddress := firstNonEmpty(
-				strings.TrimSpace(os.Getenv("CONTRACT_ADDR")),
-				strings.TrimSpace(os.Getenv("BOOK_CONTRACT")),
-				strings.TrimSpace(os.Getenv("BOOK_ADDRESS")),
-			)
+			// ✅ 关键：补齐 book_address（先查 vault:codes:book_addr，再兜底 env）
+			bookAddress := h.resolveBookAddress(ctx, codeHash, nil)
 
 			h.sendJSON(w, http.StatusOK, map[string]any{
 				"ok":           true,
@@ -294,11 +291,8 @@ func (h *AuthHandler) GetBinding(w http.ResponseWriter, r *http.Request) {
 		privateKey = strings.TrimSpace(bindData["private_key"])
 	}
 
-	bookAddress := firstNonEmpty(
-		strings.TrimSpace(os.Getenv("CONTRACT_ADDR")),
-		strings.TrimSpace(os.Getenv("BOOK_CONTRACT")),
-		strings.TrimSpace(os.Getenv("BOOK_ADDRESS")),
-	)
+	// ✅ 关键：从 bind / codes 映射里取 book_address，而不是只看 env
+	bookAddress := h.resolveBookAddress(ctx, codeHash, bindData)
 
 	resp := map[string]any{
 		"ok":           true,
@@ -315,8 +309,47 @@ func (h *AuthHandler) GetBinding(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 不在日志里打印 privateKey
-	log.Printf("✅ GetBinding: ok role=%s codeHash=%s addr=%s hit=%s", role, codeHash, address, hitKey)
+	log.Printf("✅ GetBinding: ok role=%s codeHash=%s addr=%s book=%s hit=%s", role, codeHash, address, bookAddress, hitKey)
 	h.sendJSON(w, http.StatusOK, resp)
+}
+
+// resolveBookAddress: book_address 优先级
+// 1) bindData[book_address/book_addr]
+// 2) HGET vault:codes:book_addr <0xcodeHash> or <codeHash>
+// 3) env CONTRACT_ADDR/BOOK_CONTRACT/BOOK_ADDRESS
+func (h *AuthHandler) resolveBookAddress(ctx context.Context, codeHash string, bindData map[string]string) string {
+	// 1) bindData
+	if bindData != nil {
+		if v := strings.TrimSpace(firstNonEmpty(
+			bindData["book_address"],
+			bindData["book_addr"],
+			bindData["bookAddress"],
+			bindData["bookAddr"],
+		)); v != "" {
+			return strings.ToLower(v)
+		}
+	}
+
+	// 2) code -> book_addr 映射（publisher.zip 写入）
+	for _, c := range []string{"0x" + codeHash, codeHash} {
+		if v, err := h.RDB.HGet(ctx, "vault:codes:book_addr", c).Result(); err == nil {
+			v = strings.TrimSpace(v)
+			if v != "" && common.IsHexAddress(v) {
+				return strings.ToLower(v)
+			}
+		}
+	}
+
+	// 3) env fallback
+	bookAddress := firstNonEmpty(
+		strings.TrimSpace(os.Getenv("CONTRACT_ADDR")),
+		strings.TrimSpace(os.Getenv("BOOK_CONTRACT")),
+		strings.TrimSpace(os.Getenv("BOOK_ADDRESS")),
+	)
+	if common.IsHexAddress(bookAddress) {
+		return strings.ToLower(bookAddress)
+	}
+	return ""
 }
 
 // ==============================
@@ -444,7 +477,7 @@ func (h *AuthHandler) Health(w http.ResponseWriter, r *http.Request) {
 		"ok":        true,
 		"service":   "vault-auth",
 		"timestamp": time.Now().Unix(),
-		"version":   "migrate-hardened-2",
+		"version":   "bookaddr-fixed-1",
 	})
 }
 
