@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/oschwald/geoip2-golang" // 1. 添加此引用
 	"github.com/redis/go-redis/v9"
 
 	"whale-vault/relay/internal/blockchain"
@@ -20,6 +21,7 @@ type RelayHandler struct {
 	RDB        *redis.Client
 	Client     *ethclient.Client
 	RewardSvc  *blockchain.RewardService
+	GeoIP     *geoip2.Reader // 2. 添加此字段
 }
 
 // CommonResponse 统一响应格式

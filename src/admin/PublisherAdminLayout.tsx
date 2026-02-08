@@ -162,6 +162,18 @@ async function fetchJsonOrThrow<T>(url: string, init?: RequestInit): Promise<T> 
   return (data as T) ?? ({} as T);
 }
 
+type HeatmapNode = { name: string; value: [number, number, number] };
+
+function mergeRegionCounts(items: RegionRank[]): RegionRank[] {
+  const m = new Map<string, number>();
+  for (const it of items) {
+    const key = (it.region || "Unknown").trim() || "Unknown";
+    const n = Number(it.count);
+    m.set(key, (m.get(key) || 0) + (Number.isFinite(n) ? n : 0));
+  }
+  return Array.from(m.entries()).map(([region, count]) => ({ region, count }));
+}
+
 export default function PublisherAdminLayout() {
   const navigate = useNavigate();
   const { apiBaseUrl } = useAppMode(); // keep as-is for UI/context; do NOT rely on it for URL building
@@ -247,12 +259,11 @@ export default function PublisherAdminLayout() {
     localStorage.setItem(storageKey, JSON.stringify(books));
   };
 
-  // ✅ distribution (always call absolute URL)
+  // ✅ distribution (always call absolute URL) - V2 backend returns { ok, regions }
   const fetchDistribution = async () => {
     const url = `${origin()}/api/v1/analytics/distribution`;
-    return fetchJsonOrThrow<{ ok: boolean; regions?: any[]; error?: string }>(url, { method: "GET" });
+    return fetchJsonOrThrow<{ ok: boolean; regions?: HeatmapNode[]; error?: string }>(url, { method: "GET" });
   };
-
 
   // -----------------------------
   // On-chain NFT stats (per contract)
@@ -294,7 +305,6 @@ export default function PublisherAdminLayout() {
       return next;
     });
   };
-
 
   // 切换 env 时读取各自 storage
   useEffect(() => {
@@ -362,9 +372,7 @@ export default function PublisherAdminLayout() {
         setPubAddress(authAddr);
       }
 
-      await fetchDashboardData();
-
-      // 初次进入拉一次余额（CFX + USDT）
+      // ✅ 初次进入拉一次余额（CFX + USDT）
       try {
         await fetchPublisherBalanceDataInternal(authAddr || "");
       } catch {
@@ -383,15 +391,20 @@ export default function PublisherAdminLayout() {
       if (envMode === "real") {
         const realBooks = loadBooksFromStorage();
         setBookSales(realBooks);
-
         setTotalSales(0);
 
         const heatmapResult = await fetchDistribution();
         if (heatmapResult?.ok && Array.isArray(heatmapResult.regions)) {
-          const ranked: RegionRank[] = heatmapResult.regions
-            .map((r: any) => ({ region: r.name, count: r.value?.[2] ?? 0 }))
-            .sort((a: RegionRank, b: RegionRank) => b.count - a.count)
+          const raw: RegionRank[] = heatmapResult.regions.map((r: any) => {
+            const region = String(r?.name || "Unknown").trim() || "Unknown";
+            const n = Number(r?.value?.[2]);
+            return { region, count: Number.isFinite(n) ? n : 0 };
+          });
+
+          const ranked = mergeRegionCounts(raw)
+            .sort((a, b) => b.count - a.count)
             .slice(0, 10);
+
           setRegionRanks(ranked);
         } else {
           setRegionRanks([]);
@@ -399,7 +412,6 @@ export default function PublisherAdminLayout() {
 
         // Refresh on-chain stats for visible books
         await refreshNftStats(realBooks.map((b) => b.address));
-
         return;
       }
 
@@ -416,9 +428,10 @@ export default function PublisherAdminLayout() {
       setTotalSales(getTotalSales());
 
       const ranked: RegionRank[] = MOCK_REGIONS
-        .map((r: any) => ({ region: r.name, count: r.value[2] }))
+        .map((r: any) => ({ region: String(r?.name || "Unknown"), count: Number(r?.value?.[2]) || 0 }))
         .sort((a: RegionRank, b: RegionRank) => b.count - a.count)
         .slice(0, 10);
+
       setRegionRanks(ranked);
     } catch (e: any) {
       console.error("获取仪表盘数据失败:", e);

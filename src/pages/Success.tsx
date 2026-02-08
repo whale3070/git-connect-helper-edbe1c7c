@@ -1,3 +1,4 @@
+//src/pages/Success.tsx
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
@@ -29,22 +30,28 @@ interface TxData {
   cached?: boolean;
 }
 
-/**
- * Success page (Mint result)
- *
- * Key fix:
- * - DO NOT hardcode data-contract for the faucet plugin.
- * - Use the real minted contract (txData.contract), or fallbacks from URL params.
- */
-const Success = () => {
+// --- Helpers ---
+const isHexAddress = (s: string) => /^0x[a-fA-F0-9]{40}$/.test((s || '').trim());
+
+const pickFirst = (...vals: Array<string | undefined | null>) => {
+  for (const v of vals) {
+    const t = (v ?? '').trim();
+    if (t) return t;
+  }
+  return '';
+};
+
+const Success: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { isMockMode } = useAppMode();
   const { queryTransaction } = useApi();
 
-  const txHash = searchParams.get('txHash');
-  const userAddress = (searchParams.get('address') || '0x' + 'a'.repeat(40)).toLowerCase();
-  const codeHash = searchParams.get('codeHash');
+  const txHash = (searchParams.get('txHash') || '').trim();
+
+  // ✅ Do NOT default to a fake address; keep empty if not provided.
+  const userAddress = (searchParams.get('address') || '').trim().toLowerCase();
+
   const initialStatus = (searchParams.get('status') as TxStatus) || 'pending';
 
   const [txStatus, setTxStatus] = useState<TxStatus>(initialStatus);
@@ -52,17 +59,34 @@ const Success = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [totalMinted, setTotalMinted] = useState<number | null>(null);
   const [userLocation, setUserLocation] = useState<string | null>(null);
-  const [mintedBook, setMintedBook] = useState(getRandomBook());
+  const [mintedBook] = useState(getRandomBook());
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
 
-  // Fallback contract from URL for robustness (in case txData isn't ready yet)
-  // Supports both ?contract= and legacy ?book_address=
+  // ✅ contract fallback from URL (supports contract/book_addr/book_address)
   const contractFromUrl = useMemo(() => {
-    const c = (searchParams.get('contract') || searchParams.get('book_address') || '').trim();
-    return c;
+    return pickFirst(
+      searchParams.get('contract'),
+      searchParams.get('book_addr'),
+      searchParams.get('book_address'),
+    );
   }, [searchParams]);
 
-  const effectiveContract = (txData?.contract || contractFromUrl || '').trim();
+  // ✅ effective contract: txData first, then URL fallback; normalize to lower-case safely
+  const effectiveContract = useMemo(() => {
+    const c = pickFirst(txData?.contract, contractFromUrl);
+    return c ? c.toLowerCase() : '';
+  }, [txData?.contract, contractFromUrl]);
+
+  // ✅ Explorer base: Conflux eSpace Testnet (CHAIN_ID=71)
+  const explorerTxUrl = useMemo(() => {
+    if (!txHash) return '';
+    return `https://evmtestnet.confluxscan.io/tx/${txHash}`;
+  }, [txHash]);
+
+  const openTxInExplorer = useCallback(() => {
+    if (!explorerTxUrl) return;
+    window.open(explorerTxUrl, '_blank', 'noopener,noreferrer');
+  }, [explorerTxUrl]);
 
   // 查询交易状态
   const checkTxStatus = useCallback(async () => {
@@ -75,28 +99,44 @@ const Success = () => {
       const result = await queryTransaction(txHash);
       setLastChecked(new Date());
 
-      if (result.ok && result.data) {
+      if (result?.ok && result?.data) {
+        const d: any = result.data;
+
+        // ✅ be tolerant to field names returned by backend
+        const resolvedContract = pickFirst(d.contract, d.bookAddr, d.book_address, d.bookAddress);
+        const resolvedReader = pickFirst(d.reader, userAddress);
+
         setTxData({
-          status: result.data.status,
-          tokenId: result.data.tokenId || '0',
-          reader: result.data.reader || userAddress,
-          contract: result.data.contract || '',
-          txHash: result.data.txHash || txHash,
-          cached: (result.data as any).cached,
+          status: String(d.status || ''),
+          tokenId: String(d.tokenId || '0'),
+          reader: resolvedReader ? resolvedReader.toLowerCase() : '',
+          contract: resolvedContract ? resolvedContract.toLowerCase() : '',
+          txHash: String(d.txHash || txHash),
+          cached: Boolean(d.cached),
         });
 
-        if (result.data.status === 'SUCCESS') {
+        const upper = String(d.status || '').toUpperCase();
+        if (upper === 'SUCCESS') {
           setTxStatus('success');
-          // 成功后模拟加载额外数据
-          await mockDelay(500);
-          setTotalMinted(Math.floor(Math.random() * 5000) + 1000);
-          const randomLocation = MOCK_REGIONS[Math.floor(Math.random() * MOCK_REGIONS.length)];
-          setUserLocation(randomLocation.name);
-        } else if (result.data.status === 'FAILED') {
+
+          // ✅ demo-only extra data (avoid "fake" numbers in real mode)
+          if (isMockMode) {
+            await mockDelay(300);
+            setTotalMinted(Math.floor(Math.random() * 5000) + 1000);
+            const randomLocation = MOCK_REGIONS[Math.floor(Math.random() * MOCK_REGIONS.length)];
+            setUserLocation(randomLocation.name);
+          } else {
+            setTotalMinted(null);
+            setUserLocation(null);
+          }
+        } else if (upper === 'FAILED') {
           setTxStatus('failed');
         } else {
           setTxStatus('pending');
         }
+      } else {
+        // If API returns not-ok, stay pending
+        setTxStatus('pending');
       }
     } catch (e: any) {
       console.error('查询交易状态失败:', e);
@@ -104,48 +144,48 @@ const Success = () => {
     } finally {
       setIsRefreshing(false);
     }
-  }, [txHash, queryTransaction, userAddress]);
+  }, [txHash, queryTransaction, userAddress, isMockMode]);
 
-  // 初始加载
+  // 初始化
   useEffect(() => {
-    if (initialStatus === 'pending') {
-      setTxStatus('pending');
-    }
+    setTxStatus(initialStatus || 'pending');
   }, [initialStatus]);
 
-  // OPTIONAL: auto-check once if we have txHash and status isn't success/failed yet
+  // auto-check once when we come from mint flow
   useEffect(() => {
     if (!txHash) return;
-    if (initialStatus === 'pending') {
-      // Fire and forget (UI has refresh button anyway)
-      checkTxStatus();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [txHash]);
+    if (initialStatus === 'pending') checkTxStatus();
+  }, [txHash, initialStatus, checkTxStatus]);
 
   /**
-   * Load 「看广告领 Gas / 空投」插件（Conflux Faucet Plugin）
-   * Fix: data-contract must be the real contract, not hardcoded.
+   * Load Conflux Faucet Plugin
+   * Fix:
+   * - data-contract must match the real minted contract (effectiveContract)
+   * - When contract changes, re-inject script (do not just setAttribute)
    */
   useEffect(() => {
     if (typeof window === 'undefined' || typeof document === 'undefined') return;
 
-    // Only inject when we have a valid-looking contract address
-    if (!effectiveContract || !/^0x[a-fA-F0-9]{40}$/.test(effectiveContract)) return;
-
     const SCRIPT_ID = 'conflux-faucet-plugin';
 
-    // If already exists, just update attributes (in case contract changes)
-    const existing = document.getElementById(SCRIPT_ID) as HTMLScriptElement | null;
-    if (existing) {
-      existing.setAttribute('data-contract', effectiveContract);
+    // Only inject when we have a valid-looking contract address
+    if (!effectiveContract || !isHexAddress(effectiveContract)) {
+      // If contract becomes invalid, clean up any existing plugin script
+      const old = document.getElementById(SCRIPT_ID);
+      if (old && old.parentNode) old.parentNode.removeChild(old);
       return;
     }
 
+    // Remove old script to ensure plugin reads new data-attrs
+    const existing = document.getElementById(SCRIPT_ID);
+    if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+
     const script = document.createElement('script');
     script.id = SCRIPT_ID;
-    // NOTE: keep your current plugin origin; change to https when available
-    script.src = 'http://47.76.50.74/conflux-faucet-plugin.js';
+
+    // Site is http today; if you migrate to https later, update these to https (or use same-protocol logic).
+    //script.src = 'http://47.76.50.74/conflux-faucet-plugin.js';
+	script.src = '/conflux-faucet-plugin.js';
     script.async = true;
 
     script.setAttribute('data-contract', effectiveContract);
@@ -156,22 +196,30 @@ const Success = () => {
 
     document.body.appendChild(script);
 
-    // Cleanup to avoid stale plugin if user navigates away
     return () => {
       const el = document.getElementById(SCRIPT_ID);
       if (el && el.parentNode) el.parentNode.removeChild(el);
     };
   }, [effectiveContract]);
 
-  const displayTokenId = txData?.tokenId && txData.tokenId !== '0' ? `#${txData.tokenId}` : '#---';
+  const displayTokenId =
+    txData?.tokenId && txData.tokenId !== '0' ? `#${txData.tokenId}` : '#---';
 
-  // 待确认状态 UI
+  // ---------- Pending / Syncing ----------
   if (txStatus === 'pending' || txStatus === 'syncing') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col items-center py-12 px-4">
         <div className="max-w-md w-full space-y-8">
-          <div className={`${isMockMode ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'} border rounded-lg p-2 text-center`}>
-            <p className={`text-xs font-semibold uppercase tracking-wider ${isMockMode ? 'text-amber-700' : 'text-emerald-700'}`}>
+          <div
+            className={`${
+              isMockMode ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'
+            } border rounded-lg p-2 text-center`}
+          >
+            <p
+              className={`text-xs font-semibold uppercase tracking-wider ${
+                isMockMode ? 'text-amber-700' : 'text-emerald-700'
+              }`}
+            >
               {isMockMode ? '🔧 Demo Mode' : '🟢 Dev API'}
             </p>
           </div>
@@ -191,7 +239,7 @@ const Success = () => {
               <Loader2 className={`w-5 h-5 text-amber-600 ${txStatus === 'syncing' ? 'animate-spin' : ''}`} />
               <div>
                 <p className="text-sm font-bold text-slate-800">等待区块确认</p>
-                <p className="text-xs text-slate-500">通常需要 1-5 分钟完成铸造并通知所有区块</p>
+                <p className="text-xs text-slate-500">通常需要 1-5 分钟完成铸造并通知所有节点</p>
               </div>
             </div>
 
@@ -209,7 +257,7 @@ const Success = () => {
 
           <button
             onClick={checkTxStatus}
-            disabled={isRefreshing}
+            disabled={isRefreshing || !txHash}
             className="w-full flex items-center justify-center gap-3 py-4 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold text-sm uppercase tracking-widest hover:from-indigo-600 hover:to-purple-600 transition-all disabled:opacity-50"
           >
             <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -217,16 +265,19 @@ const Success = () => {
           </button>
 
           <button
-            onClick={checkTxStatus}
-            disabled={isRefreshing}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-white border border-slate-200 text-slate-600 font-medium text-sm hover:bg-slate-50 transition-all"
+            onClick={openTxInExplorer}
+            disabled={!explorerTxUrl}
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-white border border-slate-200 text-slate-600 font-medium text-sm hover:bg-slate-50 transition-all disabled:opacity-50"
           >
             <ExternalLink className="w-4 h-4" />
             链上哈希核验
           </button>
 
           <div className="text-center">
-            <button onClick={() => navigate('/bookshelf')} className="text-xs text-slate-400 hover:text-indigo-600 transition-colors uppercase tracking-widest">
+            <button
+              onClick={() => navigate('/bookshelf')}
+              className="text-xs text-slate-400 hover:text-indigo-600 transition-colors uppercase tracking-widest"
+            >
               返回书架
             </button>
           </div>
@@ -235,7 +286,7 @@ const Success = () => {
     );
   }
 
-  // 失败状态 UI
+  // ---------- Failed ----------
   if (txStatus === 'failed') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col items-center py-12 px-4">
@@ -257,6 +308,16 @@ const Success = () => {
             </div>
           )}
 
+          {explorerTxUrl && (
+            <button
+              onClick={openTxInExplorer}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-white border border-slate-200 text-slate-600 font-medium text-sm hover:bg-slate-50 transition-all"
+            >
+              <ExternalLink className="w-4 h-4" />
+              打开区块浏览器
+            </button>
+          )}
+
           <button
             onClick={() => navigate('/bookshelf')}
             className="w-full py-4 rounded-2xl bg-slate-100 text-slate-700 font-bold text-sm uppercase tracking-widest hover:bg-slate-200 transition-all"
@@ -268,12 +329,20 @@ const Success = () => {
     );
   }
 
-  // 成功状态 UI
+  // ---------- Success ----------
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col items-center py-12 px-4">
       <div className="max-w-md w-full space-y-8">
-        <div className={`${isMockMode ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'} border rounded-lg p-2 text-center`}>
-          <p className={`text-xs font-semibold uppercase tracking-wider ${isMockMode ? 'text-amber-700' : 'text-emerald-700'}`}>
+        <div
+          className={`${
+            isMockMode ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'
+          } border rounded-lg p-2 text-center`}
+        >
+          <p
+            className={`text-xs font-semibold uppercase tracking-wider ${
+              isMockMode ? 'text-amber-700' : 'text-emerald-700'
+            }`}
+          >
             {isMockMode ? '🔧 Demo Mode' : '🟢 Dev API'}
           </p>
         </div>
@@ -292,12 +361,20 @@ const Success = () => {
             src={mintedBook.coverImage}
             alt={mintedBook.title}
             className="w-16 h-24 object-cover rounded-lg"
-            onError={(e) => { e.currentTarget.src = 'https://placehold.co/100x150/e2e8f0/6366f1?text=NFT'; }}
+            onError={(e) => {
+              e.currentTarget.src = 'https://placehold.co/100x150/e2e8f0/6366f1?text=NFT';
+            }}
           />
           <div>
             <p className="text-slate-800 font-bold">{mintedBook.title}</p>
             <p className="text-xs text-slate-400">{mintedBook.author}</p>
-            <div className={`mt-2 inline-block px-2 py-1 rounded text-[10px] font-bold uppercase ${mintedBook.verificationStatus === 'Verified Genuine' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>
+            <div
+              className={`mt-2 inline-block px-2 py-1 rounded text-[10px] font-bold uppercase ${
+                mintedBook.verificationStatus === 'Verified Genuine'
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : 'bg-red-100 text-red-600'
+              }`}
+            >
               {mintedBook.verificationStatus}
             </div>
           </div>
@@ -306,7 +383,9 @@ const Success = () => {
         {totalMinted !== null && (
           <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-3xl p-6 text-center space-y-3">
             <p className="text-xs text-indigo-600 uppercase font-semibold tracking-widest">🎉 恭喜你成为</p>
-            <p className="text-5xl font-black bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">第 {totalMinted} 位</p>
+            <p className="text-5xl font-black bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+              第 {totalMinted} 位
+            </p>
             <p className="text-slate-500 text-xs">全球领取此书 NFT 存证的读者</p>
             {userLocation && (
               <div className="flex items-center justify-center gap-2 mt-2 text-emerald-600">
@@ -325,50 +404,82 @@ const Success = () => {
             </div>
             <p className="text-xs text-emerald-600 font-semibold uppercase">Verified</p>
           </div>
+
           <div className="space-y-1">
             <span className="text-xs text-slate-400 uppercase font-semibold">绑定地址</span>
-            <p className="text-xs text-slate-500 font-mono break-all">{txData?.reader || userAddress}</p>
+            <p className="text-xs text-slate-500 font-mono break-all">
+              {txData?.reader || userAddress || '—'}
+            </p>
           </div>
-          {(txData?.contract || contractFromUrl) && (
+
+          {effectiveContract && (
             <div className="space-y-1">
               <span className="text-xs text-slate-400 uppercase font-semibold">合约地址</span>
-              <p className="text-xs text-slate-500 font-mono break-all">{(txData?.contract || contractFromUrl).trim()}</p>
+              <p className="text-xs text-slate-500 font-mono break-all">{effectiveContract}</p>
+              {!isHexAddress(effectiveContract) && (
+                <p className="text-[10px] text-amber-600">⚠️ 合约地址格式看起来不正确，faucet 插件不会加载。</p>
+              )}
             </div>
           )}
+
           {txData?.cached && (
             <div className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded inline-block">⚡ 缓存数据</div>
           )}
         </div>
 
         <div className="grid grid-cols-1 gap-3">
-          <p className="text-xs text-slate-400 font-semibold uppercase tracking-widest text-center mb-1">下一步行动计划</p>
+          <p className="text-xs text-slate-400 font-semibold uppercase tracking-widest text-center mb-1">
+            下一步行动计划
+          </p>
 
-          <button onClick={() => navigate('/Heatmap')} className="flex items-center gap-4 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 p-4 rounded-2xl hover:from-indigo-100 hover:to-purple-100 transition-all group text-left">
-            <div className="bg-indigo-100 p-3 rounded-xl"><Globe className="w-5 h-5 text-indigo-600" /></div>
+          <button
+            onClick={() => navigate('/Heatmap')}
+            className="flex items-center gap-4 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 p-4 rounded-2xl hover:from-indigo-100 hover:to-purple-100 transition-all group text-left"
+          >
+            <div className="bg-indigo-100 p-3 rounded-xl">
+              <Globe className="w-5 h-5 text-indigo-600" />
+            </div>
             <div>
               <h4 className="text-sm font-bold text-slate-800">查看全球读者热力图</h4>
               <p className="text-xs text-indigo-600">你的地区已被点亮！</p>
             </div>
           </button>
 
-          <button onClick={() => navigate('/reward')} className="flex items-center gap-4 bg-white border border-slate-200 p-4 rounded-2xl hover:bg-slate-50 transition-all group text-left">
-            <div className="bg-emerald-100 p-3 rounded-xl"><Users className="w-5 h-5 text-emerald-600" /></div>
+          <button
+            onClick={() => navigate('/reward')}
+            className="flex items-center gap-4 bg-white border border-slate-200 p-4 rounded-2xl hover:bg-slate-50 transition-all group text-left"
+          >
+            <div className="bg-emerald-100 p-3 rounded-xl">
+              <Users className="w-5 h-5 text-emerald-600" />
+            </div>
             <div>
               <h4 className="text-sm font-bold text-slate-800">推荐 5 位新用户</h4>
               <p className="text-xs text-slate-500">邀请好友激活，赚取节点分成收益</p>
             </div>
           </button>
 
-          <a href="https://matrix.to/#/!jOcJpAxdUNYvaMZuqJ:matrix.org" target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 bg-gradient-to-r from-pink-50 to-rose-50 border border-pink-200 p-4 rounded-2xl hover:from-pink-100 hover:to-rose-100 transition-all group text-left">
-            <div className="bg-pink-100 p-3 rounded-xl"><MessageCircle className="w-5 h-5 text-pink-600" /></div>
+          <a
+            href="https://matrix.to/#/!jOcJpAxdUNYvaMZuqJ:matrix.org"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-4 bg-gradient-to-r from-pink-50 to-rose-50 border border-pink-200 p-4 rounded-2xl hover:from-pink-100 hover:to-rose-100 transition-all group text-left"
+          >
+            <div className="bg-pink-100 p-3 rounded-xl">
+              <MessageCircle className="w-5 h-5 text-pink-600" />
+            </div>
             <div>
               <h4 className="text-sm font-bold text-slate-800">加入读者俱乐部</h4>
               <p className="text-xs text-pink-600">和作者、其他读者一起在线分享读书感想</p>
             </div>
           </a>
 
-          <button onClick={() => navigate('/bookshelf')} className="flex items-center gap-4 bg-gradient-to-r from-indigo-500 to-purple-500 p-4 rounded-2xl hover:from-indigo-600 hover:to-purple-600 transition-all group text-left shadow-md">
-            <div className="bg-white/20 p-3 rounded-xl"><LineChart className="w-5 h-5 text-white" /></div>
+          <button
+            onClick={() => navigate('/bookshelf')}
+            className="flex items-center gap-4 bg-gradient-to-r from-indigo-500 to-purple-500 p-4 rounded-2xl hover:from-indigo-600 hover:to-purple-600 transition-all group text-left shadow-md"
+          >
+            <div className="bg-white/20 p-3 rounded-xl">
+              <LineChart className="w-5 h-5 text-white" />
+            </div>
             <div>
               <h4 className="text-sm font-bold text-white">进入&quot;终焉大盘系统&quot;</h4>
               <p className="text-xs text-white/80">预判销量第一的爆款书籍</p>
@@ -376,9 +487,13 @@ const Success = () => {
           </button>
         </div>
 
-        {txHash && (
-          <div className="pt-4 text-center">
-            <button onClick={checkTxStatus} disabled={isRefreshing} className="text-xs text-slate-400 hover:text-indigo-600 transition-colors inline-flex items-center gap-1.5 uppercase tracking-widest disabled:opacity-50">
+        <div className="pt-4 text-center space-x-4">
+          {txHash && (
+            <button
+              onClick={checkTxStatus}
+              disabled={isRefreshing}
+              className="text-xs text-slate-400 hover:text-indigo-600 transition-colors inline-flex items-center gap-1.5 uppercase tracking-widest disabled:opacity-50"
+            >
               {isRefreshing ? (
                 <>
                   <Loader2 className="w-3 h-3 animate-spin" />
@@ -386,12 +501,21 @@ const Success = () => {
                 </>
               ) : (
                 <>
-                  链上哈希核验 <ExternalLink className="w-3 h-3" />
+                  刷新交易状态 <RefreshCw className="w-3 h-3" />
                 </>
               )}
             </button>
-          </div>
-        )}
+          )}
+
+          {explorerTxUrl && (
+            <button
+              onClick={openTxInExplorer}
+              className="text-xs text-slate-400 hover:text-indigo-600 transition-colors inline-flex items-center gap-1.5 uppercase tracking-widest"
+            >
+              链上哈希核验 <ExternalLink className="w-3 h-3" />
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

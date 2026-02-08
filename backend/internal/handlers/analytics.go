@@ -4,160 +4,315 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
-	"time"
+
+	"github.com/oschwald/geoip2-golang"
 )
 
-// 必须定义一个 package 内部使用的 ctx
+// 异步写 Redis 用（不要用 r.Context()，请求结束后可能取消）
 var analyticsCtx = context.Background()
 
-// 给 IP 查询加超时，避免 goroutine 堆积卡死
-var ipHTTPClient = &http.Client{
-	Timeout: 2 * time.Second,
-}
+// 可选：包级 GeoIP（让 mint.go 也能用，不必把 GeoIP 塞进 MintHandler）
+var geoIPGlobal *geoip2.Reader
 
-type IPInfo struct {
-	Status string  `json:"status"` // ip-api 会返回 success/fail
-	Lat    float64 `json:"lat"`
-	Lon    float64 `json:"lon"`
-	City   string  `json:"city"`
-	// 你也可以加 country / region / query 等字段，但你现在只用到 city/lat/lon
-}
+// SetGeoIP 在 main.go 里调用一次即可：handlers.SetGeoIP(geoDB)
+func SetGeoIP(db *geoip2.Reader) { geoIPGlobal = db }
 
+// ECharts 点：name + [lng, lat, count]
 type MapNode struct {
 	Name  string    `json:"name"`
 	Value []float64 `json:"value"` // [lng, lat, count]
 }
 
-// 注意：这里的 (h *RelayHandler) 必须完全匹配你的 RelayHandler 结构体名
+type LeaderboardItem struct {
+	Name  string  `json:"name"`
+	Count int     `json:"count"`
+	Lng   float64 `json:"lng"`
+	Lat   float64 `json:"lat"`
+}
+
+// Redis keys（拆开：coords + counts，保证 HINCRBY 原子增量，不丢数）
+const (
+	keyOldLocations = "vault:analytics:locations" // 旧格式兼容：field="city|lng,lat" -> count
+	keyCoords       = "vault:heatmap:coords"      // 新：field="city_NA" -> "lng,lat"
+	keyCounts       = "vault:heatmap:counts"      // 新：field="city_NA" -> count(int)
+	keyLocations    = "vault:heatmap:locations"   // 兼容输出：field="city_NA" -> "lng,lat,count"
+)
+
+// -----------------------------
+// GET /api/v1/analytics/distribution
+// 返回：{ ok: true, regions: [...] }
+// -----------------------------
 func (h *RelayHandler) GetDistribution(w http.ResponseWriter, r *http.Request) {
-	// CORS（如果你有统一 middleware，这里可以省）
+	// CORS
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-
 	if r.Method == http.MethodOptions {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 
-	var data []MapNode
+	regions := make([]MapNode, 0, 256)
 
-	// 1) 读取旧格式数据: vault:analytics:locations
-	// 格式: "城市|经度,纬度" -> count
-	res, err := h.RDB.HGetAll(r.Context(), "vault:analytics:locations").Result()
-	if err == nil {
-		for key, countStr := range res {
-			parts := strings.Split(key, "|")
-			if len(parts) < 2 {
+	coordsMap, _ := h.RDB.HGetAll(r.Context(), keyCoords).Result()
+	countsMap, _ := h.RDB.HGetAll(r.Context(), keyCounts).Result()
+
+	// ✅ 优先读 coords + counts
+	if len(coordsMap) > 0 && len(countsMap) > 0 {
+		for field, coordStr := range coordsMap {
+			coordParts := strings.Split(coordStr, ",")
+			if len(coordParts) < 2 {
 				continue
 			}
-			coords := strings.Split(parts[1], ",")
-			if len(coords) < 2 {
+			lng, _ := strconv.ParseFloat(strings.TrimSpace(coordParts[0]), 64)
+			lat, _ := strconv.ParseFloat(strings.TrimSpace(coordParts[1]), 64)
+
+			cntStr := strings.TrimSpace(countsMap[field])
+			if cntStr == "" {
 				continue
 			}
+			cnt, _ := strconv.ParseFloat(cntStr, 64)
 
-			lng, _ := strconv.ParseFloat(coords[0], 64)
-			lat, _ := strconv.ParseFloat(coords[1], 64)
-			cnt, _ := strconv.ParseFloat(countStr, 64)
+			city := strings.TrimSpace(strings.Split(field, "_")[0])
+			if city == "" {
+				city = "Unknown"
+			}
 
-			data = append(data, MapNode{
-				Name:  parts[0],
+			regions = append(regions, MapNode{
+				Name:  city,
 				Value: []float64{lng, lat, cnt},
 			})
 		}
+
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"ok":      true,
+			"regions": regions,
+		})
+		return
 	}
 
-	// 2) 读取新格式数据: vault:heatmap:locations
-	// 格式: "城市_国家" -> "经度,纬度,计数"
-	newRes, err := h.RDB.HGetAll(r.Context(), "vault:heatmap:locations").Result()
-	if err == nil {
-		for key, value := range newRes {
-			parts := strings.Split(value, ",")
-			if len(parts) < 3 {
-				continue
-			}
-			lng, _ := strconv.ParseFloat(parts[0], 64)
-			lat, _ := strconv.ParseFloat(parts[1], 64)
-			cnt, _ := strconv.ParseFloat(parts[2], 64)
-
-			// 城市名从 key 提取 (格式: "城市_国家")
-			cityName := strings.Split(key, "_")[0]
-			if cityName == "" {
-				cityName = key
-			}
-
-			data = append(data, MapNode{
-				Name:  cityName,
-				Value: []float64{lng, lat, cnt},
-			})
+	// 兼容：老结构 vault:heatmap:locations
+	resNew, _ := h.RDB.HGetAll(r.Context(), keyLocations).Result()
+	for field, value := range resNew {
+		parts := strings.Split(value, ",")
+		if len(parts) < 3 {
+			continue
 		}
-	}
+		lng, _ := strconv.ParseFloat(strings.TrimSpace(parts[0]), 64)
+		lat, _ := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
+		cnt, _ := strconv.ParseFloat(strings.TrimSpace(parts[2]), 64)
 
-	if data == nil {
-		data = []MapNode{}
-	}
-	_ = json.NewEncoder(w).Encode(data)
-}
-
-// CaptureEcho：捕获一次“读者行为/回响”并按 IP 统计地理位置
-func (h *RelayHandler) CaptureEcho(ip string) {
-	go func(userIP string) {
-		// 本地/空 IP 直接忽略
-		if userIP == "" || userIP == "127.0.0.1" || userIP == "::1" {
-			return
-		}
-
-		// ip-api：建议用 https，避免某些环境 http 被拦
-		url := "https://ip-api.com/json/" + userIP + "?fields=status,city,lat,lon"
-		resp, err := ipHTTPClient.Get(url)
-		if err != nil {
-			return
-		}
-		defer resp.Body.Close()
-
-		var info IPInfo
-		if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
-			return
-		}
-		if info.Status != "success" {
-			return
-		}
-		// city 为空也没关系，给个兜底
-		city := strings.TrimSpace(info.City)
+		city := strings.TrimSpace(strings.Split(field, "_")[0])
 		if city == "" {
 			city = "Unknown"
 		}
 
-		// --- 旧格式写入（保持兼容）---
-		locationKeyOld := fmt.Sprintf("%s|%f,%f", city, info.Lon, info.Lat)
-		_ = h.RDB.HIncrBy(analyticsCtx, "vault:analytics:locations", locationKeyOld, 1).Err()
+		regions = append(regions, MapNode{
+			Name:  city,
+			Value: []float64{lng, lat, cnt},
+		})
+	}
 
-		// --- 新格式写入（你 GetDistribution 在读这个）---
-		// 你现在 new key 的 field 是 "城市_国家"，但你没取 country，所以先用城市做 field
-		// value 结构: "lng,lat,count"
-		field := fmt.Sprintf("%s_%s", city, "NA")
-		val, err := h.RDB.HGet(analyticsCtx, "vault:heatmap:locations", field).Result()
-		if err != nil {
-			// 不存在就写 1
-			newVal := fmt.Sprintf("%f,%f,%d", info.Lon, info.Lat, 1)
-			_ = h.RDB.HSet(analyticsCtx, "vault:heatmap:locations", field, newVal).Err()
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"ok":      true,
+		"regions": regions,
+	})
+}
+
+// -----------------------------
+// GET /api/v1/analytics/leaderboard?limit=10
+// 返回：{ ok: true, data: { items: [...] } }
+// -----------------------------
+func (h *RelayHandler) GetLeaderboard(w http.ResponseWriter, r *http.Request) {
+	// CORS
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit <= 0 || limit > 50 {
+		limit = 10
+	}
+
+	coordsMap, _ := h.RDB.HGetAll(r.Context(), keyCoords).Result()
+	countsMap, _ := h.RDB.HGetAll(r.Context(), keyCounts).Result()
+
+	items := make([]LeaderboardItem, 0, len(countsMap))
+
+	// ✅ 优先新结构
+	if len(coordsMap) > 0 && len(countsMap) > 0 {
+		for field, cntStr := range countsMap {
+			cnt, _ := strconv.Atoi(strings.TrimSpace(cntStr))
+
+			coordStr := coordsMap[field]
+			coordParts := strings.Split(coordStr, ",")
+			if len(coordParts) < 2 {
+				continue
+			}
+			lng, _ := strconv.ParseFloat(strings.TrimSpace(coordParts[0]), 64)
+			lat, _ := strconv.ParseFloat(strings.TrimSpace(coordParts[1]), 64)
+
+			city := strings.TrimSpace(strings.Split(field, "_")[0])
+			if city == "" {
+				city = "Unknown"
+			}
+
+			items = append(items, LeaderboardItem{
+				Name:  city,
+				Count: cnt,
+				Lng:   lng,
+				Lat:   lat,
+			})
+		}
+	} else {
+		// 兼容老结构 vault:heatmap:locations
+		resNew, _ := h.RDB.HGetAll(r.Context(), keyLocations).Result()
+		for field, value := range resNew {
+			parts := strings.Split(value, ",")
+			if len(parts) < 3 {
+				continue
+			}
+			lng, _ := strconv.ParseFloat(strings.TrimSpace(parts[0]), 64)
+			lat, _ := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
+			cnt, _ := strconv.Atoi(strings.TrimSpace(parts[2]))
+
+			city := strings.TrimSpace(strings.Split(field, "_")[0])
+			if city == "" {
+				city = "Unknown"
+			}
+
+			items = append(items, LeaderboardItem{
+				Name:  city,
+				Count: cnt,
+				Lng:   lng,
+				Lat:   lat,
+			})
+		}
+	}
+
+	sort.Slice(items, func(i, j int) bool { return items[i].Count > items[j].Count })
+	if len(items) > limit {
+		items = items[:limit]
+	}
+
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"ok": true,
+		"data": map[string]any{
+			"items": items,
+		},
+	})
+}
+
+// -----------------------------
+// CaptureEcho：捕获一次“读者行为/回响”并按 IP -> city 聚合
+// 使用 GeoLite2 本地库：GeoIP.City(ip)
+// 写入：
+// - vault:analytics:locations（旧格式兼容）
+// - vault:heatmap:coords（lng,lat）
+// - vault:heatmap:counts（HINCRBY 原子不丢数）
+// - vault:heatmap:locations（兼容输出：lng,lat,count）
+// -----------------------------
+func (h *RelayHandler) CaptureEcho(ip string) {
+	go func(userIP string) {
+		userIP = strings.TrimSpace(userIP)
+		if userIP == "" || userIP == "127.0.0.1" || userIP == "::1" {
 			return
 		}
 
-		parts := strings.Split(val, ",")
-		if len(parts) >= 3 {
-			oldCnt, _ := strconv.Atoi(strings.TrimSpace(parts[2]))
-			newCnt := oldCnt + 1
-			newVal := fmt.Sprintf("%f,%f,%d", info.Lon, info.Lat, newCnt)
-			_ = h.RDB.HSet(analyticsCtx, "vault:heatmap:locations", field, newVal).Err()
-		} else {
-			// 格式坏了就重置
-			newVal := fmt.Sprintf("%f,%f,%d", info.Lon, info.Lat, 1)
-			_ = h.RDB.HSet(analyticsCtx, "vault:heatmap:locations", field, newVal).Err()
+		// 选择 GeoIP：优先 h.GeoIP，其次包级 geoIPGlobal
+		db := h.GeoIP
+		if db == nil {
+			db = geoIPGlobal
 		}
+		if db == nil {
+			return
+		}
+
+		parsed := parseIP(userIP)
+		if parsed == nil {
+			return
+		}
+
+		rec, err := db.City(parsed)
+		if err != nil {
+			return
+		}
+
+		lat := rec.Location.Latitude
+		lng := rec.Location.Longitude
+
+		city := pickCityName(rec.City.Names)
+		if strings.TrimSpace(city) == "" {
+			city = "Unknown"
+		}
+
+		// 旧格式写入（兼容）
+		locationKeyOld := fmt.Sprintf("%s|%f,%f", city, lng, lat)
+		_ = h.RDB.HIncrBy(analyticsCtx, keyOldLocations, locationKeyOld, 1).Err()
+
+		// 新格式：coords + counts
+		field := fmt.Sprintf("%s_%s", city, "NA")
+
+		// coords：覆盖写（同城坐标固定）
+		coordVal := fmt.Sprintf("%f,%f", lng, lat)
+		_ = h.RDB.HSet(analyticsCtx, keyCoords, field, coordVal).Err()
+
+		// counts：原子自增（关键）
+		newCnt, err := h.RDB.HIncrBy(analyticsCtx, keyCounts, field, 1).Result()
+		if err != nil {
+			return
+		}
+
+		// locations：兼容输出（lng,lat,count）
+		locVal := fmt.Sprintf("%f,%f,%d", lng, lat, newCnt)
+		_ = h.RDB.HSet(analyticsCtx, keyLocations, field, locVal).Err()
 	}(ip)
+}
+
+func parseIP(s string) net.IP {
+	// 可能带端口
+	if host, _, err := net.SplitHostPort(s); err == nil {
+		s = host
+	}
+	// 可能是 "client, proxy1"
+	if strings.Contains(s, ",") {
+		s = strings.TrimSpace(strings.Split(s, ",")[0])
+	}
+	return net.ParseIP(strings.TrimSpace(s))
+}
+
+func pickCityName(names map[string]string) string {
+	if names == nil {
+		return ""
+	}
+	// 中文优先
+	if v := strings.TrimSpace(names["zh-CN"]); v != "" {
+		return v
+	}
+	if v := strings.TrimSpace(names["zh"]); v != "" {
+		return v
+	}
+	// 英文兜底
+	if v := strings.TrimSpace(names["en"]); v != "" {
+		return v
+	}
+	// 任意一个
+	for _, v := range names {
+		v = strings.TrimSpace(v)
+		if v != "" {
+			return v
+		}
+	}
+	return ""
 }

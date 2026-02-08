@@ -1,3 +1,5 @@
+//input_hashcode_Reward.tsx 非常值得保留
+//它是你将来： 无扫码环境，API 被限制，B 端后台版本，的「备用方案」
 import React, { useState, useEffect } from 'react';
 
 const Reward: React.FC = () => {

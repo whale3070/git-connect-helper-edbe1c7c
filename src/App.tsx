@@ -1,3 +1,4 @@
+//App.tsx
 import React from "react";
 import { BrowserRouter, Routes, Route, Link, Navigate } from "react-router-dom";
 
@@ -36,7 +37,7 @@ export default function App() {
 
       // 你后端固定地址：保持你现有逻辑不动
       const response = await fetch(
-        `http://whale3070:8080/secret/verify?address=${encodeURIComponent(
+        `/secret/verify?address=${encodeURIComponent(
           addr
         )}&codeHash=${encodeURIComponent(hash)}`
       );

@@ -1,3 +1,4 @@
+// TopUpPage.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { ethers } from "ethers";
@@ -80,6 +81,7 @@ function isHexAddress(addr: string) {
   const a = (addr || "").trim();
   return /^0x[a-fA-F0-9]{40}$/.test(a);
 }
+
 function isHexTxHash(v: string) {
   const s = (v || "").trim();
   return /^0x[a-fA-F0-9]{64}$/.test(s);
@@ -159,7 +161,7 @@ async function inferTokenAddressFromReceipt(rpcUrl: string, txHash: string, publ
 
     if (!firstTransferToken) firstTransferToken = tokenAddr;
 
-    if (wantToMatchPub && log.topics?.length >= 3) {
+    if (wantToMatchPub && (log.topics?.length || 0) >= 3) {
       const toAddr = topicToAddr(log.topics[2]);
       if (toAddr && toAddr.toLowerCase() === pub) {
         return tokenAddr;
@@ -189,10 +191,19 @@ async function readErc20MetaAndBalance(rpcUrl: string, tokenAddr: string, owner:
 
 export default function TopUpPage() {
   const { apiBaseUrl } = useAppMode();
-  const base = useMemo(() => (apiBaseUrl || "").replace(/\/$/, ""), [apiBaseUrl]);
+
+  // ✅ 优先使用同域（适配 nginx 80 -> 8080 反代）；只有在明确配置 apiBaseUrl 时才覆盖
+  const base = useMemo(() => {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const cfg = (apiBaseUrl || "").trim();
+    return (cfg ? cfg : origin).replace(/\/$/, "");
+  }, [apiBaseUrl]);
 
   // ✅ 从 PublisherAdminLayout 的 Outlet context 拿到 “充值后刷新”
-  const { refreshAfterTopup } = useOutletContext<PublisherOutletContext>();
+  //    做成可选：避免 context 没提供时页面直接崩
+  const outlet = useOutletContext<PublisherOutletContext | any>();
+  const refreshAfterTopup: (payload: { symbol: string; address: string }) => Promise<void> =
+    outlet?.refreshAfterTopup || (async () => {});
 
   const [asset, setAsset] = useState<Asset>("FIAT");
   const [network, setNetwork] = useState<Network>("bank_transfer");
@@ -332,8 +343,8 @@ export default function TopUpPage() {
 
     setRechargeLoading(true);
     try {
-      // ✅ base 为空时走同域
-      const url = `${base}/api/admin/usdt/recharge`.replace(/^\/api/, "/api").replace("//api", "/api");
+      // ✅ nginx 80 -> 8080 反代：建议用同域 /api/admin/...
+      const url = `${base}/api/admin/usdt/recharge`;
 
       const res = await fetch(url, {
         method: "POST",

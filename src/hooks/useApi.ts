@@ -6,7 +6,6 @@ import {
   MOCK_REGIONS,
   MOCK_LEADERBOARD,
   mockDelay,
-  generateFakeTxHash,
 } from "../data/mockData";
 
 interface ApiResponse<T> {
@@ -31,10 +30,18 @@ export const useApi = () => {
 
   /**
    * 统一 fetch：自动 Mock/Real，且对非 JSON（HTML/网关错误页）更友好
+   *
+   * ✅ 同域部署建议：
+   * - AppModeContext 里把 apiBaseUrl 设为 ""（空字符串）即可
+   * - endpoint 请始终以 "/" 开头（你当前都是）
    */
   const apiFetch = useCallback(
     async <T,>(endpoint: string, options?: RequestInit, mockFn?: () => Promise<T>): Promise<T> => {
-      if (isMockMode && mockFn) return mockFn();
+      // Mock: 只有明确允许的接口才走 mockFn
+      if (isMockMode) {
+        if (mockFn) return mockFn();
+        throw new Error("Mock 模式下该接口已禁用");
+      }
 
       const base = (apiBaseUrl || "").replace(/\/$/, "");
       const url = `${base}${endpoint}`;
@@ -58,7 +65,6 @@ export const useApi = () => {
         if (!res.ok) {
           throw new Error(`API 非JSON错误: HTTP ${res.status}. ${preview}`);
         }
-        // 状态 ok 但不是 json，也视为错误
         throw new Error(`响应格式错误: 期望 JSON，但得到 ${contentType || "unknown"}: ${preview}`);
       }
 
@@ -75,32 +81,29 @@ export const useApi = () => {
   // ================== 读者相关 ==================
 
   /**
-   * 铸造 NFT
+   * ✅ 铸造 NFT（同域后端）
    * POST /relay/mint
+   *
+   * ⚠️ 已按你的要求：删掉 mint mock（Mock 模式会直接报错）
    */
   const mintNFT = useCallback(
     async (bookAddress: string, readerAddress: string) => {
-      return apiFetch<ApiResponse<{ tx_hash: string }>>(
-        `/relay/mint`,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            book_address: bookAddress,
-            reader_address: readerAddress,
-          }),
-        },
-        async () => {
-          await mockDelay(1200);
-          return { ok: true, data: { tx_hash: generateFakeTxHash() } };
-        }
-      );
+      return apiFetch<ApiResponse<{ tx_hash: string }>>(`/relay/mint`, {
+        method: "POST",
+        body: JSON.stringify({
+          book_address: bookAddress,
+          reader_address: readerAddress,
+        }),
+      });
     },
     [apiFetch]
   );
 
   /**
-   * 查询交易状态
+   * ✅ 查询交易状态（同域后端）
    * GET /relay/tx/{txHash}
+   *
+   * ⚠️ 已按你的要求：删掉 tx mock（Mock 模式会直接报错）
    */
   const queryTransaction = useCallback(
     async (txHash: string) => {
@@ -112,23 +115,7 @@ export const useApi = () => {
           contract: string;
           txHash: string;
         }>
-      >(
-        `/relay/tx/${encodeURIComponent(txHash)}`,
-        { method: "GET" },
-        async () => {
-          await mockDelay(700);
-          return {
-            ok: true,
-            data: {
-              status: "SUCCESS",
-              reader: "0x5ad82cEB0A10153C06F1215B70d0a5dB97Ad9240",
-              tokenId: String(Math.floor(Math.random() * 1000) + 1),
-              contract: "0xe250ae653190F2EDF3ac79FD9bdF2687A90CDE84",
-              txHash,
-            },
-          };
-        }
-      );
+      >(`/relay/tx/${encodeURIComponent(txHash)}`, { method: "GET" });
     },
     [apiFetch]
   );
@@ -224,7 +211,7 @@ export const useApi = () => {
           return {
             ok: true,
             data: {
-              tx_hash: generateFakeTxHash(),
+              tx_hash: "0xMOCK_DISABLED",
               count: Math.floor(Math.random() * 20) + 1,
             },
           };
@@ -286,8 +273,6 @@ export const useApi = () => {
    * ✅ 获取 ERC20 余额（用于 USDT 等 token）
    * - 走链上 RPC（不依赖后端）
    * - 返回 balance 是“人类可读”的字符串（已按 decimals 格式化）
-   *
-   * 注意：你必须传 eSpace RPC（例如 https://evm.confluxrpc.com）+ 0x 地址
    */
   const getErc20Balance = useCallback(
     async (rpcUrl: string, tokenAddress: string, ownerAddress: string) => {
@@ -299,7 +284,7 @@ export const useApi = () => {
       if (!isHexAddress(token)) throw new Error(`token 地址无效（需要 0x + 40 位十六进制）：${token}`);
       if (!isHexAddress(owner)) throw new Error(`owner 地址无效（需要 0x + 40 位十六进制）：${owner}`);
 
-      // mock：返回一个看起来合理的数
+      // mock：返回一个看起来合理的数（仅用于 UI 展示）
       if (isMockMode) {
         await mockDelay(250);
         return { ok: true, token, owner, symbol: "USDT", decimals: 6, balance: (Math.random() * 500).toFixed(2) };
@@ -308,7 +293,6 @@ export const useApi = () => {
       const provider = new ethers.JsonRpcProvider(rpc);
       const c = new ethers.Contract(token, ERC20_ABI, provider);
 
-      // 有些 token 的 symbol() 可能 revert，所以单独 try
       const [raw, decimals, symbol] = await Promise.all([
         c.balanceOf(owner),
         c.decimals(),
@@ -321,13 +305,13 @@ export const useApi = () => {
     [isMockMode]
   );
 
-  // ❌ 你要求立刻删掉：deployBook（带 privKey 的版本）
-  // 如果你之后要做“无 privKey”的部署，请在 PublisherAdminLayout 里继续用你现在的 POST /api/v1/publisher/deploy-book（后端从 Redis 取私钥）。
-
   // ================== 分析相关 ==================
 
   /**
-   * 真实后端：GET /api/v1/analytics/distribution
+   * ✅ 热力/分布数据（同域后端）
+   * GET /api/v1/analytics/distribution
+   *
+   * ✅ 命名对齐：Heatmap 组件统一用 fetchDistribution()
    */
   const fetchDistribution = useCallback(async () => {
     return apiFetch<{ ok: boolean; regions: Array<{ name: string; value: [number, number, number] }> }>(
@@ -339,6 +323,8 @@ export const useApi = () => {
       }
     );
   }, [apiFetch]);
+
+  // ================== 市场相关 ==================
 
   /**
    * 市场数据：GET /api/v1/market/tickers

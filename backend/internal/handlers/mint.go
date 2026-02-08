@@ -1,3 +1,4 @@
+// mint.go
 package handlers
 
 import (
@@ -5,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -33,13 +35,14 @@ type MintHandler struct {
 // HTTP Handler: Mint NFT
 // POST /relay/mint
 //
-// ✅ 改动要点（针对你现在的现象）
-// 1) 默认不再回退 CONTRACT_ADDR（避免 e250 “幽灵合约”回来）
-//    - 只有当 ALLOW_CONTRACT_FALLBACK=1 时才允许回退
-// 2) 增加 preflight eth_call（cast call）来提前拿到 revert（更好排查）
-//    - 只有当 PREFLIGHT_CALL=1 时启用
-// 3) 关键：确保使用“正确的 relayer 私钥”签名
-//    - 许多合约会限制 minter 角色，如果你 RELAYER_PRIVATE_KEY 对应地址不在 allowlist，会直接 revert
+// ✅ 方案A：强制使用出版社 owner 私钥签名（mintToReader 通常 onlyOwner）
+//
+// 其他保留：
+// 1) 默认不回退 CONTRACT_ADDR（避免“幽灵合约”回来），仅当 ALLOW_CONTRACT_FALLBACK=1 才允许
+// 2) 可选 preflight eth_call（cast call），仅当 PREFLIGHT_CALL=1 启用
+//
+// ✅ 新增：Mint 成功后加入热力图回响
+//    go (&RelayHandler{RDB: h.RDB}).CaptureEcho(ip)
 // ==============================
 func (h *MintHandler) Mint(w http.ResponseWriter, r *http.Request) {
 	type MintReq struct {
@@ -87,29 +90,36 @@ func (h *MintHandler) Mint(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
 	defer cancel()
 
-	// 解析 relayer（很关键：后面 preflight 需要 --from）
-	relayerPriv := strings.TrimSpace(os.Getenv("RELAYER_PRIVATE_KEY"))
-	relayerPriv = strings.TrimPrefix(relayerPriv, "0x")
-	if relayerPriv == "" {
-		writeErr(w, "CONFIG_MISSING", "RELAYER_PRIVATE_KEY not set")
+	// ✅ 方案A：强制使用出版社 owner 私钥
+	ownerPriv := strings.TrimSpace(os.Getenv("PUBLISHER_OWNER_PRIVKEY"))
+	ownerPriv = strings.TrimPrefix(ownerPriv, "0x")
+	if ownerPriv == "" {
+		writeErr(w, "CONFIG_MISSING", "PUBLISHER_OWNER_PRIVKEY not set")
 		return
 	}
-	relayerAddr, err := deriveAddressFromPriv(relayerPriv)
+
+	ownerAddr, err := deriveAddressFromPriv(ownerPriv)
 	if err != nil {
-		writeErr(w, "CONFIG_MISSING", "RELAYER_PRIVATE_KEY invalid")
+		writeErr(w, "CONFIG_MISSING", "PUBLISHER_OWNER_PRIVKEY invalid")
+		return
+	}
+
+	// （可选但强烈推荐）硬校验：防止你 env 塞错 key
+	const expectedOwner = "0x62d64E720bb617EfE92249ade17DF3d239eAe76E"
+	if strings.ToLower(ownerAddr) != strings.ToLower(expectedOwner) {
+		writeErr(w, "CONFIG_MISSING", fmt.Sprintf("owner key mismatch: got=%s want=%s", ownerAddr, expectedOwner))
 		return
 	}
 
 	// ✅ 可选：preflight eth_call，尽早发现 revert 原因
 	if strings.TrimSpace(os.Getenv("PREFLIGHT_CALL")) == "1" {
-		if err := preflightMintByCastCall(ctx, bookAddr, readerAddr, relayerAddr); err != nil {
-			// 这里把 preflight 的错误直接透出（比“send 后 revert”更好定位）
+		if err := preflightMintByCastCall(ctx, bookAddr, readerAddr, ownerAddr); err != nil {
 			mapMintError(w, err)
 			return
 		}
 	}
 
-	txHash, err := mintByCastSend(ctx, bookAddr, readerAddr, relayerPriv)
+	txHash, err := mintByCastSend(ctx, bookAddr, readerAddr, ownerPriv)
 	if err != nil {
 		mapMintError(w, err)
 		return
@@ -121,17 +131,25 @@ func (h *MintHandler) Mint(w http.ResponseWriter, r *http.Request) {
 		_ = h.RDB.HSet(r.Context(), "vault:tx:mint:"+strings.ToLower(txHash),
 			"book", bookAddr,
 			"reader", readerAddr,
-			"relayer", strings.ToLower(relayerAddr),
+			"relayer", strings.ToLower(ownerAddr), // 字段名不改，值写 owner（方案A）
 			"ts", fmt.Sprintf("%d", time.Now().Unix()),
 		).Err()
 		_ = h.RDB.Expire(r.Context(), "vault:tx:mint:"+strings.ToLower(txHash), 7*24*time.Hour).Err()
+	}
+
+	// ✅ 新增：Mint 成功后写一次“回响/热力图”
+	// 这里不依赖 MintHandler 拥有 GeoIP；CaptureEcho 会 fallback 到全局 geoIPGlobal（SetGeoIP 注入）
+	if h.RDB != nil {
+		ip := extractClientIP(r)
+		// 用一个轻量 RelayHandler 临时调用（避免改 main.go 传 relayH）
+		go (&RelayHandler{RDB: h.RDB}).CaptureEcho(ip)
 	}
 
 	writeOK(w, map[string]string{
 		"tx_hash":     txHash,
 		"book_addr":   bookAddr,
 		"reader_addr": readerAddr,
-		"relayer":     strings.ToLower(relayerAddr),
+		"relayer":     strings.ToLower(ownerAddr),
 	})
 }
 
@@ -144,16 +162,15 @@ func deriveAddressFromPriv(privHexNo0x string) (string, error) {
 }
 
 // ==============================
-// preflight: cast call (eth_call) with --from=relayer
+// preflight: cast call (eth_call) with --from=owner
 // ==============================
-func preflightMintByCastCall(ctx context.Context, bookAddr, readerAddr, relayerAddr string) error {
+func preflightMintByCastCall(ctx context.Context, bookAddr, readerAddr, fromAddr string) error {
 	castBin := foundryCastPath()
 	rpcURL := strings.TrimSpace(os.Getenv("RPC_URL"))
 	if rpcURL == "" {
 		return errors.New("CONFIG_MISSING")
 	}
 
-	// cast call <addr> "mintToReader(address)" <reader> --from <relayer> --rpc-url <rpc>
 	cmd := exec.CommandContext(
 		ctx,
 		castBin,
@@ -161,7 +178,7 @@ func preflightMintByCastCall(ctx context.Context, bookAddr, readerAddr, relayerA
 		bookAddr,
 		"mintToReader(address)",
 		readerAddr,
-		"--from", relayerAddr,
+		"--from", fromAddr,
 		"--rpc-url", rpcURL,
 	)
 
@@ -170,16 +187,15 @@ func preflightMintByCastCall(ctx context.Context, bookAddr, readerAddr, relayerA
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		// preflight 失败：通常能在 stderr 里看到更直观的 revert 信息
 		return parseCastError(stderr.String())
 	}
 	return nil
 }
 
 // ==============================
-// send: cast send
+// send: cast send (signed by owner)
 // ==============================
-func mintByCastSend(ctx context.Context, bookAddr, readerAddr, relayerPrivNo0x string) (string, error) {
+func mintByCastSend(ctx context.Context, bookAddr, readerAddr, privNo0x string) (string, error) {
 	castBin := foundryCastPath()
 	rpcURL := strings.TrimSpace(os.Getenv("RPC_URL"))
 	if rpcURL == "" {
@@ -193,7 +209,7 @@ func mintByCastSend(ctx context.Context, bookAddr, readerAddr, relayerPrivNo0x s
 		bookAddr,
 		"mintToReader(address)",
 		readerAddr,
-		"--private-key", "0x"+relayerPrivNo0x,
+		"--private-key", "0x"+privNo0x,
 		"--rpc-url", rpcURL,
 		"--legacy",
 	)
@@ -215,7 +231,6 @@ func mintByCastSend(ctx context.Context, bookAddr, readerAddr, relayerPrivNo0x s
 			}
 		}
 	}
-
 	return "", errors.New("TX_HASH_NOT_FOUND")
 }
 
@@ -238,8 +253,6 @@ func parseCastError(stderr string) error {
 	case strings.Contains(s, "nonce"):
 		return errors.New("NONCE_ERROR")
 	case strings.Contains(s, "revert"):
-		// 很多情况下 stderr 里会包含 revert reason / selector 等
-		// 你也可以在这里做更细分的匹配
 		return fmt.Errorf("EVM_REVERT: %s", strings.TrimSpace(stderr))
 	default:
 		return fmt.Errorf("CAST_ERROR: %s", strings.TrimSpace(stderr))
@@ -285,15 +298,14 @@ func mapMintError(w http.ResponseWriter, err error) {
 	case msg == "ALREADY_MINTED":
 		writeErr(w, "ALREADY_MINTED", "reader already minted this nft")
 	case msg == "INSUFFICIENT_GAS":
-		writeErr(w, "INSUFFICIENT_GAS", "relayer gas insufficient")
+		writeErr(w, "INSUFFICIENT_GAS", "signer gas insufficient")
 	case msg == "NONCE_ERROR":
 		writeErr(w, "NONCE_ERROR", "nonce conflict, retry")
 	case msg == "CONFIG_MISSING":
-		writeErr(w, "CONFIG_MISSING", "RELAYER_PRIVATE_KEY or RPC_URL not set")
+		writeErr(w, "CONFIG_MISSING", "PUBLISHER_OWNER_PRIVKEY or RPC_URL not set")
 	case msg == "TX_HASH_NOT_FOUND":
 		writeErr(w, "TX_HASH_NOT_FOUND", "tx hash not found in cast output")
 	default:
-		// 把 revert/cast 的 stderr 原样（短一些）透出去，排错更快
 		if strings.HasPrefix(msg, "EVM_REVERT:") {
 			writeErr(w, "REVERT", strings.TrimSpace(strings.TrimPrefix(msg, "EVM_REVERT:")))
 			return
@@ -304,4 +316,31 @@ func mapMintError(w http.ResponseWriter, err error) {
 		}
 		writeErr(w, "MINT_FAILED", msg)
 	}
+}
+
+// ==============================
+// 新增：从请求里提取客户端 IP（和你之前 ip.go 的逻辑一致）
+// ==============================
+func extractClientIP(r *http.Request) string {
+	// 1) X-Forwarded-For: "client, proxy1, proxy2"
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		parts := strings.Split(xff, ",")
+		if len(parts) > 0 {
+			ip := strings.TrimSpace(parts[0])
+			if ip != "" {
+				return ip
+			}
+		}
+	}
+
+	// 2) X-Real-IP
+	if ip := strings.TrimSpace(r.Header.Get("X-Real-IP")); ip != "" {
+		return ip
+	}
+
+	// 3) fallback: RemoteAddr
+	if host, _, err := net.SplitHostPort(strings.TrimSpace(r.RemoteAddr)); err == nil {
+		return host
+	}
+	return strings.TrimSpace(r.RemoteAddr)
 }

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAppMode } from '../contexts/AppModeContext';
 import { useApi } from '../hooks/useApi';
 
@@ -7,13 +7,26 @@ interface VerifyPageProps {
   onVerify?: (address: string, codeHash: string) => Promise<'publisher' | 'author' | 'reader' | null>;
 }
 
+const isHexAddress = (v: string) => /^0x[a-fA-F0-9]{40}$/.test((v || '').trim());
+
 const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
   const navigate = useNavigate();
   const { hash } = useParams<{ hash: string }>();
+  const [searchParams] = useSearchParams();
   const { isMockMode } = useAppMode();
   const { verifyCode, getBinding } = useApi();
 
-  const [codeHash] = useState(hash || '');
+  // ✅ 不要把 hash 固定进 useState（路由变化时会不同步）
+  const codeHash = useMemo(() => (hash || '').trim(), [hash]);
+
+  // ✅ 兼容未来参数名：contract / book_addr / book_address
+  const contractFromUrl = useMemo(() => {
+    return (searchParams.get('contract') || searchParams.get('book_addr') || searchParams.get('book_address') || '').trim();
+  }, [searchParams]);
+
+  // ✅ 可选：透传 book_id
+  const bookIdFromUrl = useMemo(() => (searchParams.get('book_id') || '').trim(), [searchParams]);
+
   const [targetAddress, setTargetAddress] = useState('');
   const [bookAddress, setBookAddress] = useState('');
   const [loading, setLoading] = useState(true);
@@ -24,15 +37,22 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
 
   useEffect(() => {
     const initTerminal = async () => {
+      setLoading(true);
+      setError('');
+      setInvalidCode(false);
+      setRole(null);
+
       if (!codeHash) {
+        setInvalidCode(true);
+        setError('缺少二维码 hash');
         setLoading(false);
         return;
       }
 
       try {
+        // 1) 先 verify，拿 role
         const verifyResult = await verifyCode(codeHash);
 
-        // 检查后端返回的 ok 字段或 error 字段
         if (!verifyResult.ok || verifyResult.error) {
           setInvalidCode(true);
           setError(verifyResult.error || '无效的二维码，请购买正版商品');
@@ -40,26 +60,34 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
           return;
         }
 
-        if (verifyResult.role === 'publisher') {
-          setRole('publisher');
-        } else if (verifyResult.role === 'author') {
-          setRole('author');
-        } else {
-          setRole('reader');
-        }
+        const detectedRole: 'publisher' | 'author' | 'reader' =
+          verifyResult.role === 'publisher' ? 'publisher' : verifyResult.role === 'author' ? 'author' : 'reader';
 
-        try {
-          const bindResult = await getBinding(codeHash);
-          if (bindResult.ok) {
+        setRole(detectedRole);
+
+        // 2) ✅ 关键修复：只有 reader 才去 getBinding
+        // 因为你的后端设计是：publisher/author 的 get-binding 直接 404（严格防误授权）
+        if (detectedRole === 'reader') {
+          try {
+            const bindResult = await getBinding(codeHash);
+
+            if (!bindResult.ok || bindResult.error) {
+              setInvalidCode(true);
+              setError(bindResult.error || '无效的二维码，请购买正版商品');
+              setLoading(false);
+              return;
+            }
+
             if (bindResult.address) setTargetAddress(bindResult.address);
-            if (bindResult.book_address) setBookAddress(bindResult.book_address);
-          }
-        } catch (bindError: any) {
-          // 绑定信息获取失败也表明是无效二维码
-          console.warn('获取绑定信息失败:', bindError);
-          if (bindError.message?.includes('not found') || bindError.message?.includes('Binding not found')) {
+
+            // 优先用后端返回的 book_address；否则用 URL 兜底
+            const ba = (bindResult.book_address || '').trim();
+            if (ba) setBookAddress(ba);
+            else if (contractFromUrl) setBookAddress(contractFromUrl);
+          } catch (bindError: any) {
+            // reader binding 失败，视为无效码（或后端异常）
             setInvalidCode(true);
-            setError('无效的二维码，请购买正版商品');
+            setError(bindError?.message || '无效的二维码，请购买正版商品');
             setLoading(false);
             return;
           }
@@ -68,39 +96,34 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
         setLoading(false);
       } catch (e: any) {
         console.error('验证失败:', e);
-        const errMsg = e.message || '';
-
-        // 任何后端返回的错误都视为无效二维码
-        if (
-          errMsg.includes('403') ||
-          errMsg.includes('404') ||
-          errMsg.includes('not found') ||
-          errMsg.includes('Binding not found') ||
-          errMsg.includes('invalid') ||
-          errMsg.includes('不存在')
-        ) {
-          setInvalidCode(true);
-          setError('无效的二维码，请购买正版商品');
-        } else {
-          setInvalidCode(true);
-          setError('无效的二维码，请购买正版商品');
-        }
+        setInvalidCode(true);
+        setError(e?.message || '无效的二维码，请购买正版商品');
         setLoading(false);
       }
     };
 
     initTerminal();
-  }, [codeHash, verifyCode, getBinding]);
+  }, [codeHash, verifyCode, getBinding, contractFromUrl]);
 
   const confirmAndGoToMint = () => {
     const params = new URLSearchParams();
 
-    // ✅ keep legacy params AND add canonical "contract"
-    if (bookAddress) {
-      params.set('book_address', bookAddress);
-      params.set('contract', bookAddress);
-    }
+    // reader address
     if (targetAddress) params.set('reader_address', targetAddress);
+
+    // ✅ contract/bookAddress：同时写 3 个名字，避免历史版本不兼容
+    const ba = (bookAddress || contractFromUrl || '').trim();
+    if (ba) {
+      params.set('book_address', ba);
+      params.set('book_addr', ba);
+      params.set('contract', ba);
+    }
+
+    // optional passthrough
+    if (bookIdFromUrl) params.set('book_id', bookIdFromUrl);
+
+    // helpful for downstream pages
+    params.set('codeHash', codeHash);
 
     navigate(`/mint/${codeHash}?${params.toString()}`);
   };
@@ -141,12 +164,14 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
   }
 
   const handleAdminLogin = async () => {
-    if (!targetAddress) {
-      setError('请输入管理钱包地址');
+    const addr = (targetAddress || '').trim();
+    if (!isHexAddress(addr)) {
+      setError('请输入有效的管理钱包地址（0x + 40 hex）');
       return;
     }
 
-    localStorage.setItem('vault_pub_auth', targetAddress.toLowerCase());
+    // keep legacy keys
+    localStorage.setItem('vault_pub_auth', addr.toLowerCase());
     localStorage.setItem('vault_user_role', role || 'publisher');
     localStorage.setItem('vault_code_hash', codeHash);
 
@@ -174,8 +199,12 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col items-center justify-center p-4">
       <div className="max-w-md w-full bg-white p-8 rounded-3xl border border-slate-200 shadow-lg space-y-8">
         {/* 模式标识 */}
-        <div className={`${isMockMode ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'} border rounded-xl p-3 text-center`}>
-          <p className={`text-xs font-semibold uppercase tracking-wider ${isMockMode ? 'text-amber-700' : 'text-emerald-700'}`}>
+        <div
+          className={`${isMockMode ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'} border rounded-xl p-3 text-center`}
+        >
+          <p
+            className={`text-xs font-semibold uppercase tracking-wider ${isMockMode ? 'text-amber-700' : 'text-emerald-700'}`}
+          >
             {isMockMode ? '🔧 Demo Mode - Mock Data' : '🟢 Dev API - 后端验证'}
           </p>
         </div>
@@ -203,10 +232,10 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
               <p className="text-xs font-mono text-slate-600 break-all">{targetAddress || '0x...'}</p>
             </div>
 
-            {bookAddress && (
+            {(bookAddress || contractFromUrl) && (
               <div className="space-y-1">
                 <p className="text-xs text-slate-500 uppercase font-semibold tracking-wider">书籍合约地址</p>
-                <p className="text-xs font-mono text-indigo-600 break-all">{bookAddress}</p>
+                <p className="text-xs font-mono text-indigo-600 break-all">{(bookAddress || contractFromUrl).trim()}</p>
               </div>
             )}
 
@@ -219,7 +248,11 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
           </div>
         ) : (
           <div className="space-y-6">
-            <div className={`p-4 rounded-xl ${role === 'publisher' ? 'bg-purple-50 border border-purple-100' : 'bg-orange-50 border border-orange-100'}`}>
+            <div
+              className={`p-4 rounded-xl ${
+                role === 'publisher' ? 'bg-purple-50 border border-purple-100' : 'bg-orange-50 border border-orange-100'
+              }`}
+            >
               <p className={`text-sm ${role === 'publisher' ? 'text-purple-700' : 'text-orange-700'}`}>
                 {role === 'publisher'
                   ? '📚 出版社管理后台：查看销量、部署新书、生成二维码、热力分析'
@@ -234,7 +267,6 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
                 onChange={(e) => setTargetAddress(e.target.value)}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-4 text-sm font-mono text-center outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 transition-all"
                 placeholder="0x..."
-                readOnly={!!targetAddress}
               />
             </div>
 
@@ -264,7 +296,9 @@ const VerifyPage: React.FC<VerifyPageProps> = ({ onVerify }) => {
               <h3 className="text-lg font-bold text-slate-800">确权博弈提醒</h3>
               <p className="text-sm text-slate-500 leading-relaxed px-2">
                 领取 NFT 会使该激活码失效。<br />
-                <span className="text-amber-600 font-medium">若您有推荐人，请确保其已在系统中登记您的激活码，否则他将无法获得推广奖励。</span>
+                <span className="text-amber-600 font-medium">
+                  若您有推荐人，请确保其已在系统中登记您的激活码，否则他将无法获得推广奖励。
+                </span>
               </p>
             </div>
 

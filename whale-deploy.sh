@@ -98,3 +98,4 @@ echo "✅ 部署成功！"
 echo "   - 线上目录：$WEB_ROOT"
 echo "   - 备份目录：${BACKUP_DIR:-无}"
 echo "🎉 部署闭环完成。"
+cp /root/faucethub/server/conflux-faucet-plugin.js /var/www/static/

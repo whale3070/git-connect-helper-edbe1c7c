@@ -36,6 +36,20 @@ type PublisherHandler struct {
 // -----------------------------
 // 1️⃣ 生成兑换码 ZIP（读者专用二维码）
 // -----------------------------
+//
+// 支持参数：
+// - count: 1..500，默认 100
+// - book_id: 可选，32 bytes 业务ID（0x + 64 hex）
+// - contract: 可选，真实 NFT/书籍子合约地址（0x...）；✅ 前端建议用这个参数名
+// - book_addr: 可选，真实 NFT/书籍子合约地址（0x...）；✅ 兼容旧参数名
+//
+// Redis 写入：
+// - SADD vault:codes:valid <code>
+// - HSET vault:codes:book_id <code> <book_id>                  (可选)
+// - SADD vault:codes:by_book_id:<book_id> <code>               (可选)
+// - HSET vault:codes:book_addr <code> <contract>               (可选，推荐)
+// - SADD vault:codes:by_book_addr:<contract> <code>            (可选，推荐)
+// - SADD vault:nft:contracts <contract>                        (可选，推荐：用于后端自动监控所有合约统计)
 func (h *PublisherHandler) GenerateAndDownloadZip(w http.ResponseWriter, r *http.Request) {
 	countStr := r.URL.Query().Get("count")
 	count, _ := strconv.Atoi(countStr)
@@ -51,6 +65,19 @@ func (h *PublisherHandler) GenerateAndDownloadZip(w http.ResponseWriter, r *http
 	}
 	bookID = strings.ToLower(bookID)
 
+	// ✅ 可选：绑定 book_addr（真实 NFT 合约地址 / 书籍子合约地址）
+	//
+	// 你前端目前用的是 ?contract=0x...，之前这里读的是 book_addr，导致没写入映射。
+	// 这里做兼容：优先读 contract，其次读 book_addr。
+	bookAddr := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("contract")))
+	if bookAddr == "" {
+		bookAddr = strings.ToLower(strings.TrimSpace(r.URL.Query().Get("book_addr")))
+	}
+	if bookAddr != "" && !common.IsHexAddress(bookAddr) {
+		http.Error(w, "contract/book_addr 格式不正确：需要 0x... 地址", http.StatusBadRequest)
+		return
+	}
+
 	zipBuf := new(bytes.Buffer)
 	zipWriter := zip.NewWriter(zipBuf)
 	var generatedCodes []string
@@ -64,9 +91,19 @@ func (h *PublisherHandler) GenerateAndDownloadZip(w http.ResponseWriter, r *http
 		code := "0x" + hex.EncodeToString(b)
 		generatedCodes = append(generatedCodes, code)
 
+		// 构造二维码 URL（读者端落地页）
 		qrUrl := fmt.Sprintf("http://whale3070.com/vault_mint_nft/%s", code)
+
+		// ✅ 把 book_addr 也放进二维码 URL，方便前端“完全不依赖后端补全映射”的场景
+		qs := make([]string, 0, 2)
 		if bookID != "" {
-			qrUrl = qrUrl + "?book_id=" + bookID
+			qs = append(qs, "book_id="+bookID)
+		}
+		if bookAddr != "" {
+			qs = append(qs, "book_addr="+bookAddr)
+		}
+		if len(qs) > 0 {
+			qrUrl = qrUrl + "?" + strings.Join(qs, "&")
 		}
 
 		qrPng, _ := qrcode.Encode(qrUrl, qrcode.Medium, 256)
@@ -78,16 +115,24 @@ func (h *PublisherHandler) GenerateAndDownloadZip(w http.ResponseWriter, r *http
 		_, _ = t.Write([]byte(code))
 	}
 
-	// 写入 Redis：读者码有效集合 + 可选 book_id 绑定
+	// 写入 Redis：读者码有效集合 + 可选 book_id / book_addr 绑定
 	ctx := r.Context()
 	pipe := h.RDB.Pipeline()
 	for _, c := range generatedCodes {
 		pipe.SAdd(ctx, "vault:codes:valid", c)
+
 		if bookID != "" {
-			// code -> book_id 的映射
 			pipe.HSet(ctx, "vault:codes:book_id", c, bookID)
-			// 也可以按 book_id 聚合一份，方便后续统计/作废
 			pipe.SAdd(ctx, "vault:codes:by_book_id:"+bookID, c)
+		}
+
+		if bookAddr != "" {
+			// ✅ code -> book_addr（mint 目标合约）
+			pipe.HSet(ctx, "vault:codes:book_addr", c, bookAddr)
+			// ✅ 聚合：按合约查所有兑换码（可用于作废/审计）
+			pipe.SAdd(ctx, "vault:codes:by_book_addr:"+bookAddr, c)
+			// ✅ 注册到“需要监控统计的合约集合”
+			pipe.SAdd(ctx, "vault:nft:contracts", bookAddr)
 		}
 	}
 
@@ -98,15 +143,11 @@ func (h *PublisherHandler) GenerateAndDownloadZip(w http.ResponseWriter, r *http
 
 	_ = zipWriter.Close()
 	w.Header().Set("Content-Type", "application/zip")
+
 	ts := time.Now().Format("20060102_150405") // 例如 20260206_001233
-w.Header().Set(
-	"Content-Disposition",
-	fmt.Sprintf(
-		"attachment; filename=WhaleVault_Codes_%d_%s.zip",
-		count,
-		ts,
-	),
-)
+	w.Header().Set("Content-Disposition",
+		fmt.Sprintf("attachment; filename=WhaleVault_Codes_%d_%s.zip", count, ts),
+	)
 
 	_, _ = w.Write(zipBuf.Bytes())
 }
@@ -114,13 +155,6 @@ w.Header().Set(
 // -----------------------------
 // 2️⃣ 删除“部署书籍合约”逻辑后的兼容入口
 // -----------------------------
-//
-// 你当前 main.go 仍绑定了：
-// - /api/v1/factory/create        -> publisherH.CreateBook
-// - /api/v1/publisher/create-book -> publisherH.CreateBook
-//
-// 为避免你删掉方法后编译失败，这里保留 CreateBook，但明确返回 410，提示走新的部署路由。
-// ✅ 你已经把 /api/v1/publisher/deploy-book 指向 factoryH.DeployBook，所以部署仍然可用。
 func (h *PublisherHandler) CreateBook(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(http.StatusGone)
@@ -131,7 +165,6 @@ func (h *PublisherHandler) CreateBook(w http.ResponseWriter, r *http.Request) {
 }
 
 // indexDeployedBook writes a fast index for publisher -> books (ZSET) and per-book meta (HASH).
-// ✅ 部署逻辑已移出本文件，但索引函数可保留，供未来“从链上事件同步/其他模块写入”复用。
 func (h *PublisherHandler) indexDeployedBook(ctx context.Context, publisherLower, bookAddrLower string, reqName, reqSymbol, reqAuthor, reqSerial, txHash string) {
 	zkey := "vault:publisher:books:z:" + publisherLower
 	_ = h.RDB.ZAdd(ctx, zkey, redis.Z{

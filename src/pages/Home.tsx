@@ -1,6 +1,15 @@
-import React from 'react'
+// Home.tsx
+import React, { useEffect, useMemo, useState } from 'react';
 
 export default function Home() {
+  const [visitedAt, setVisitedAt] = useState<string>('');
+
+  useEffect(() => {
+    setVisitedAt(new Date().toLocaleString());
+  }, []);
+
+  const year = useMemo(() => new Date().getFullYear(), []);
+
   return (
     <div className="min-h-screen bg-[#0f172a] flex flex-col">
       {/* 顶部导航栏 */}
@@ -13,9 +22,7 @@ export default function Home() {
                 Whale Vault
               </h1>
             </div>
-            <div className="text-sm text-white/50">
-              一书一码 • 物理确权
-            </div>
+            <div className="text-sm text-white/50">一书一码 • 物理确权</div>
           </div>
         </div>
       </header>
@@ -32,35 +39,27 @@ export default function Home() {
               <h1 className="text-4xl font-bold mb-3 bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
                 欢迎使用 Whale Vault
               </h1>
-              <p className="text-lg text-white/80 mb-2">
-                请使用微信或系统相机扫描实体书上的二维码
-              </p>
-              <p className="text-white/60 text-sm">
-                二维码位于书籍背面或扉页，扫码后自动进入验证流程
-              </p>
+              <p className="text-lg text-white/80 mb-2">请使用微信或系统相机扫描实体书上的二维码</p>
+              <p className="text-white/60 text-sm">二维码位于书籍背面或扉页，扫码后自动进入验证流程</p>
             </div>
-            
+
             {/* 分隔线 */}
             <div className="my-8 border-t border-white/10"></div>
-            
+
             {/* 使用说明 */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               <div className="bg-black/30 p-6 rounded-lg border border-white/5">
                 <div className="text-2xl mb-3">🔍</div>
                 <h3 className="font-semibold mb-2 text-cyan-400">第一步：查找二维码</h3>
-                <p className="text-sm text-white/60">
-                  在您购买的正版书籍背面或扉页找到唯一的二维码标签
-                </p>
+                <p className="text-sm text-white/60">在您购买的正版书籍背面或扉页找到唯一的二维码标签</p>
               </div>
-              
+
               <div className="bg-black/30 p-6 rounded-lg border border-white/5">
                 <div className="text-2xl mb-3">📱</div>
                 <h3 className="font-semibold mb-2 text-blue-400">第二步：扫码识别</h3>
-                <p className="text-sm text-white/60">
-                  使用微信或手机相机扫描二维码，自动打开验证页面
-                </p>
+                <p className="text-sm text-white/60">使用微信或手机相机扫描二维码，自动打开验证页面</p>
               </div>
-              
+
               <div className="bg-black/30 p-6 rounded-lg border border-white/5">
                 <div className="text-2xl mb-3">✅</div>
                 <h3 className="font-semibold mb-2 text-green-400">第三步：自动验证</h3>
@@ -69,7 +68,7 @@ export default function Home() {
                 </p>
               </div>
             </div>
-            
+
             {/* 重要提示 */}
             <div className="bg-gradient-to-r from-cyan-900/10 to-blue-900/10 border border-cyan-500/20 rounded-lg p-6 mb-8">
               <h3 className="font-semibold mb-3 text-cyan-300 flex items-center">
@@ -82,15 +81,15 @@ export default function Home() {
                 <li>• 如有问题，请联系客服人员</li>
               </ul>
             </div>
-            
+
             {/* 技术支持信息 */}
             <div className="text-center">
               <p className="text-sm text-white/50">
-                技术支持 | 区块链网络: Monad Testnet | 系统版本: 1.0.0
+                技术支持 | 区块链网络: Conflux eSpace Testnet (Chain ID: 71) | 系统版本: 1.0.0
               </p>
             </div>
           </div>
-          
+
           {/* 联系信息 */}
           <div className="mt-8 text-center">
             <div className="inline-flex flex-col items-center space-y-2 text-sm text-white/40">
@@ -101,22 +100,20 @@ export default function Home() {
                 <span>•</span>
                 <span>🌐 去中心化存储保障</span>
               </div>
-              <div className="text-xs">
-                访问时间: {new Date().toLocaleString()}
-              </div>
+              <div className="text-xs">访问时间: {visitedAt || '—'}</div>
             </div>
           </div>
         </div>
       </main>
-      
+
       {/* 页脚 */}
       <footer className="border-t border-white/10 bg-white/5">
         <div className="mx-auto max-w-7xl px-4 py-6">
           <div className="text-center text-white/30 text-xs tracking-widest uppercase">
-            <p>Whale Vault • Decentralized Identity System © {new Date().getFullYear()}</p>
+            <p>Whale Vault • Decentralized Identity System © {year}</p>
           </div>
         </div>
       </footer>
     </div>
-  )
+  );
 }
